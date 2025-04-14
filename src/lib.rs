@@ -1,8 +1,19 @@
+mod matrix;
+mod modules;
 mod ring;
 
+use std::vec;
+
+use matrix::Matrix;
+use modules::Module;
 use rand::rngs::OsRng;
 use rand::RngCore;
-use sha3::{Digest, Sha3_256, Sha3_512};
+use sha3::{
+    digest::{ExtendableOutput, Update, XofReader},
+    Digest, Sha3_256, Sha3_512, Shake128, Shake256,
+};
+
+use ring::KyberRing;
 
 enum TYPE {
     ML_KEM_512,
@@ -16,10 +27,12 @@ struct MLKEM {
     eta_2: u8,
     du: u8,
     dv: u8,
+    ring: KyberRing,
 }
 
 impl MLKEM {
     fn new(type_of: TYPE) -> Self {
+        let ring = KyberRing::new(3329, 256);
         match type_of {
             TYPE::ML_KEM_512 => MLKEM {
                 k: 2,
@@ -27,6 +40,7 @@ impl MLKEM {
                 eta_2: 2,
                 du: 10,
                 dv: 4,
+                ring,
             },
             TYPE::ML_KEM_768 => MLKEM {
                 k: 3,
@@ -34,6 +48,7 @@ impl MLKEM {
                 eta_2: 2,
                 du: 10,
                 dv: 4,
+                ring,
             },
             TYPE::ML_KEM_1024 => MLKEM {
                 k: 2,
@@ -41,6 +56,7 @@ impl MLKEM {
                 eta_2: 2,
                 du: 11,
                 dv: 5,
+                ring,
             },
         }
     }
@@ -72,6 +88,10 @@ impl MLKEM {
 
         let (rho, sigma) = Self::_G(&pre_image);
 
+        let a_hat = self._generate_matrix_from_seed(&rho, false);
+
+        let n = 0;
+
         todo!()
     }
 
@@ -83,19 +103,64 @@ impl MLKEM {
 
     fn _G(s: &[u8]) -> (Vec<u8>, Vec<u8>) {
         let mut hasher = Sha3_512::new();
-        hasher.update(s);
+        Update::update(&mut hasher, s);
         let result = hasher.finalize();
         return (result[..32].to_vec(), result[32..].to_vec());
     }
 
     fn _H(s: &[u8]) -> Vec<u8> {
         let mut hasher = Sha3_256::new();
-        hasher.update(s);
+        Update::update(&mut hasher, s);
         let result = hasher.finalize();
         return result.to_vec();
     }
 
-    fn _generate_matrix_from_seed(&self, rho: &[u8], transpose: bool) {}
+    fn _xof(b: &[u8], i: u8, j: u8) -> Vec<u8> {
+        // TODO: Add checks
+        let mut hasher = Shake128::default();
+        let pre_image: Vec<u8> = [b, &[i], &[j]].concat();
+        hasher.update(&pre_image);
+
+        let mut reader = hasher.finalize_xof();
+        let mut buf = [0u8; 840];
+        reader.read(&mut buf);
+
+        buf.to_vec()
+    }
+
+    fn _prf(eta: u8, s: &[u8], b: u8) -> Vec<u8> {
+        // TODO: Add checks
+        let mut hasher = Shake256::default();
+        let pre_image: Vec<u8> = [s, &[b]].concat();
+        hasher.update(&pre_image);
+
+        let mut reader = hasher.finalize_xof();
+        let mut buf: Vec<u8> = vec![0u8; (eta * 64).into()];
+        reader.read(&mut buf);
+
+        buf.to_vec()
+    }
+
+    fn _generate_matrix_from_seed(&self, rho: &[u8], transpose: bool) -> Matrix {
+        let k: usize = self.k.into();
+        let mut a_data = vec![vec![KyberRing::default(); k]; k];
+        for i in 0..k {
+            for j in 0..k {
+                let xof_bytes = Self::_xof(rho, i.try_into().unwrap(), j.try_into().unwrap());
+                a_data[i][j] = self.ring.ntt_sample(&xof_bytes);
+            }
+        }
+        Matrix::new(&a_data, transpose)
+    }
+
+    fn _generate_error_vector(&self, sigma: &[u8], eta: u8, n: u8) -> (Matrix, u8) {
+        let k: usize = self.k.into();
+        let elements = vec![0; k];
+        for i in 0..k {
+            let prf_output = Self::_prf(eta, sigma, n);
+        }
+        todo!()
+    }
 }
 
 #[cfg(test)]
