@@ -92,6 +92,14 @@ impl MLKEM {
 
         let n = 0;
 
+        let (s, N) = self._generate_error_vector(&sigma, self.eta_1, n);
+
+        let (e, N) = self._generate_error_vector(&sigma, self.eta_1, N);
+
+        let s_hat = s.to_ntt();
+
+        let e_hat = e.to_ntt();
+
         todo!()
     }
 
@@ -155,11 +163,15 @@ impl MLKEM {
 
     fn _generate_error_vector(&self, sigma: &[u8], eta: u8, n: u8) -> (Matrix, u8) {
         let k: usize = self.k.into();
-        let elements = vec![0; k];
+        let mut elements = vec![KyberRing::default(); k];
+        let mut n = n;
         for i in 0..k {
             let prf_output = Self::_prf(eta, sigma, n);
+            elements[i] = self.ring.cbd(&prf_output, eta).unwrap();
+            n += 1;
         }
-        todo!()
+        let data = vec![elements];
+        (Matrix::new(&data, true), n)
     }
 }
 
