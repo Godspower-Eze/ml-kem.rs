@@ -1,5 +1,5 @@
 use num_bigint::BigUint;
-use std::ops::{Add, Mul};
+use std::ops::{Add, AddAssign, Mul};
 
 #[derive(Default, Clone)]
 pub struct Ring {
@@ -50,6 +50,10 @@ impl Ring {
             return false;
         }
         self.coefficients[1..].iter().all(|x| *x == 0) && !self.coefficients[0] == 0
+    }
+
+    pub fn encode(&self, d: usize) -> Vec<u8> {
+        todo!()
     }
 
     pub fn ntt_sample(&self, input_bytes: &[u8]) -> Self {
@@ -137,11 +141,31 @@ impl Add for &Ring {
     }
 }
 
+impl AddAssign for Ring {
+    fn add_assign(&mut self, rhs: Self) {
+        let new_ring = &*self + &rhs;
+        *self = new_ring;
+    }
+}
+
 impl Mul for &Ring {
     type Output = Ring;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        todo!()
+        let mut new_coeffs = vec![0; self.n];
+        let n = self.n;
+        for i in 0..n {
+            for j in 0..(n - i) {
+                new_coeffs[i + j] += self.coefficients[i] * rhs.coefficients[j];
+            }
+        }
+        for j in 1..n {
+            for i in (n - j)..n {
+                new_coeffs[i + j - n] -= self.coefficients[i] * rhs.coefficients[j]
+            }
+        }
+        new_coeffs = new_coeffs.iter().map(|x| x % self.q).collect();
+        Ring::new(&new_coeffs)
     }
 }
 

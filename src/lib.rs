@@ -100,7 +100,11 @@ impl MLKEM {
 
         let se_hat = &s_hat + &e_hat;
 
-        let t_hat = a_hat.mat_mul(&se_hat);
+        let t_hat = a_hat.mat_mul(&se_hat).unwrap();
+
+        let ek_pke = t_hat.encode(12) + rho;
+
+        let dk_pke = s_hat.encode(12);
 
         todo!()
     }
