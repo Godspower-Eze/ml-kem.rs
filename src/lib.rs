@@ -1,11 +1,9 @@
-mod matrix;
-mod modules;
+mod module;
 mod ring;
 
 use std::vec;
 
-use matrix::Matrix;
-use modules::Module;
+use module::Module;
 use rand::rngs::OsRng;
 use rand::RngCore;
 use sha3::{
@@ -13,7 +11,7 @@ use sha3::{
     Digest, Sha3_256, Sha3_512, Shake128, Shake256,
 };
 
-use ring::KyberRing;
+use ring::Ring;
 
 enum TYPE {
     ML_KEM_512,
@@ -27,12 +25,12 @@ struct MLKEM {
     eta_2: u8,
     du: u8,
     dv: u8,
-    ring: KyberRing,
+    ring: Ring,
 }
 
 impl MLKEM {
     fn new(type_of: TYPE) -> Self {
-        let ring = KyberRing::new(3329, 256);
+        let ring = Ring::new(&vec![]);
         match type_of {
             TYPE::ML_KEM_512 => MLKEM {
                 k: 2,
@@ -100,6 +98,10 @@ impl MLKEM {
 
         let e_hat = e.to_ntt();
 
+        let se_hat = &s_hat + &e_hat;
+
+        let t_hat = a_hat.mat_mul(&se_hat);
+
         todo!()
     }
 
@@ -149,21 +151,21 @@ impl MLKEM {
         buf.to_vec()
     }
 
-    fn _generate_matrix_from_seed(&self, rho: &[u8], transpose: bool) -> Matrix {
+    fn _generate_matrix_from_seed(&self, rho: &[u8], transpose: bool) -> Module {
         let k: usize = self.k.into();
-        let mut a_data = vec![vec![KyberRing::default(); k]; k];
+        let mut a_data = vec![vec![Ring::default(); k]; k];
         for i in 0..k {
             for j in 0..k {
                 let xof_bytes = Self::_xof(rho, i.try_into().unwrap(), j.try_into().unwrap());
                 a_data[i][j] = self.ring.ntt_sample(&xof_bytes);
             }
         }
-        Matrix::new(&a_data, transpose)
+        Module::new(&a_data, transpose)
     }
 
-    fn _generate_error_vector(&self, sigma: &[u8], eta: u8, n: u8) -> (Matrix, u8) {
+    fn _generate_error_vector(&self, sigma: &[u8], eta: u8, n: u8) -> (Module, u8) {
         let k: usize = self.k.into();
-        let mut elements = vec![KyberRing::default(); k];
+        let mut elements = vec![Ring::default(); k];
         let mut n = n;
         for i in 0..k {
             let prf_output = Self::_prf(eta, sigma, n);
@@ -171,7 +173,7 @@ impl MLKEM {
             n += 1;
         }
         let data = vec![elements];
-        (Matrix::new(&data, true), n)
+        (Module::new(&data, true), n)
     }
 }
 

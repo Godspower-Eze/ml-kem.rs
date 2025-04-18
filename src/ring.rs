@@ -1,9 +1,8 @@
 use num_bigint::BigUint;
-use num_traits::pow;
-use std::ops::BitAnd;
+use std::ops::{Add, Mul};
 
 #[derive(Default, Clone)]
-pub struct KyberRing {
+pub struct Ring {
     q: usize,
     n: usize,
     coefficients: Vec<usize>,
@@ -12,12 +11,12 @@ pub struct KyberRing {
     ntt_f: usize,
 }
 
-impl KyberRing {
-    pub fn new(coefficients: Vec<usize>) -> Self {
-        KyberRing {
+impl Ring {
+    pub fn new(coefficients: &Vec<usize>) -> Self {
+        Ring {
             q: 3329,
             n: 256,
-            coefficients,
+            coefficients: coefficients.clone(),
             root_of_unity: 17,
             ntt_f: 3303, // pow(128, -1, 3329)
             ntt_zetas: vec![
@@ -37,6 +36,10 @@ impl KyberRing {
     fn is_zero(&self) -> bool {
         // Return if the polynomial ring is zero: f = 0
         self.coefficients.iter().all(|x| *x == 0)
+    }
+
+    fn add_mod_q(&self, x: usize, y: usize) -> usize {
+        (x + y) % self.q
     }
 
     fn is_constant(&self) -> bool {
@@ -73,7 +76,7 @@ impl KyberRing {
 
             i = i + 3;
         }
-        KyberRing::new(coefficients)
+        Ring::new(&coefficients)
     }
 
     pub fn cbd(&self, input_bytes: &[u8], eta: u8) -> Result<Self, String> {
@@ -95,7 +98,7 @@ impl KyberRing {
             let value = (one_bits_in_a - one_bits_in_b) % 3329;
             coefficients[i] = value.try_into().unwrap();
         }
-        Ok(KyberRing::new(coefficients))
+        Ok(Ring::new(&coefficients))
     }
 
     pub fn to_ntt(&self) -> Self {
@@ -117,7 +120,28 @@ impl KyberRing {
             }
             l = l >> 1;
         }
-        KyberRing::new(coefficients)
+        Ring::new(&coefficients)
+    }
+}
+
+impl Add for &Ring {
+    type Output = Ring;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        // TODO: Add checks
+        let mut new_coeffs = vec![];
+        for (x, y) in self.coefficients.iter().zip(rhs.coefficients.iter()) {
+            new_coeffs.push(self.add_mod_q(*x, *y));
+        }
+        Ring::new(&new_coeffs)
+    }
+}
+
+impl Mul for &Ring {
+    type Output = Ring;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        todo!()
     }
 }
 
