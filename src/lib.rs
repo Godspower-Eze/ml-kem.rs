@@ -59,12 +59,13 @@ impl MLKEM {
         }
     }
 
-    fn keygen(&self) -> (String, String) {
+    fn keygen(&self) -> (Vec<u8>, Vec<u8>) {
         let d = Self::random_bytes(32);
         let z = Self::random_bytes(32);
 
-        // let (ek, dk) = self._keygen_internal(&d, &z);
-        todo!()
+        let (ek, dk) = self._keygen_internal(&d, &z);
+
+        (ek, dk)
     }
 
     fn key_derive(&self, seed: String) -> (String, String) {
@@ -79,9 +80,16 @@ impl MLKEM {
         todo!()
     }
 
-    // fn _keygen_internal(&self, d: &[u8], z: &[u8]) -> (&[u8], &[u8]) {}
+    fn _keygen_internal(&self, d: &[u8], z: &[u8]) -> (Vec<u8>, Vec<u8>) {
+        let (ek_pke, dk_pke) = self._k_pke_keygen(d);
 
-    fn _k_pke_keygen(&self, d: &[u8]) -> (String, String) {
+        let ek = ek_pke;
+        let dk = [dk_pke, ek.clone(), Self::_H(&ek), z.to_vec()].concat();
+
+        (ek, dk)
+    }
+
+    fn _k_pke_keygen(&self, d: &[u8]) -> (Vec<u8>, Vec<u8>) {
         let pre_image: Vec<u8> = [d, &[self.k]].concat();
 
         let (rho, sigma) = Self::_G(&pre_image);
@@ -102,11 +110,11 @@ impl MLKEM {
 
         let t_hat = a_hat.mat_mul(&se_hat).unwrap();
 
-        let ek_pke = t_hat.encode(12) + rho;
+        let ek_pke = [t_hat.encode(12), rho].concat();
 
         let dk_pke = s_hat.encode(12);
 
-        todo!()
+        (ek_pke, dk_pke)
     }
 
     fn random_bytes(length: usize) -> Vec<u8> {

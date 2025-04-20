@@ -55,7 +55,14 @@ impl Module {
     }
 
     pub fn encode(&self, d: usize) -> Vec<u8> {
-        todo!()
+        let mut output = vec![];
+        for row in self.data.iter() {
+            for element in row {
+                let bytes = element.encode(d);
+                output = [output, bytes].concat()
+            }
+        }
+        output
     }
 }
 
