@@ -6,7 +6,7 @@ A rust library for ML-KEM(Module-Lattice-Based Key-Encryption Mechanism)
 
 ### 🚧 Project Status
 
-**This project is currently under active development.**  Expect breaking changes and incomplete features. Contributions, feedback,
+**This project is currently under active development.**  Expect breaking changes and incomplete features.
 
 ### Features
 
