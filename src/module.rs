@@ -23,18 +23,15 @@ impl Module {
         if n_1 != m_2 {
             return Err(String::from("Invalid dimensions"));
         }
+        let mut new_data: Vec<Vec<Ring>> = vec![];
         for i in 0..m_1 {
             for j in 0..n_2 {
-                let mut summation = vec![];
                 for k in 0..n_1 {
-                    let a = &self.data[i][k];
-                    let b = &rhs.data[k][j];
-                    let mul = a * b;
-                    summation.push(mul);
+                    new_data[i][j] += &self.data[i][k] * &rhs.data[k][j]
                 }
             }
         }
-        todo!()
+        Ok(Module::new(&new_data, false))
     }
 
     fn dim(&self) -> (usize, usize) {
@@ -55,6 +52,17 @@ impl Module {
             data.push(new_row);
         }
         Module::new(&data, self.transpose)
+    }
+
+    pub fn encode(&self, d: usize) -> Vec<u8> {
+        let mut output = vec![];
+        for row in self.data.iter() {
+            for element in row {
+                let bytes = element.encode(d);
+                output = [output, bytes].concat()
+            }
+        }
+        output
     }
 }
 

@@ -1,5 +1,6 @@
 use num_bigint::BigUint;
-use std::ops::{Add, Mul};
+use num_traits::Zero;
+use std::ops::{Add, AddAssign, Mul};
 
 #[derive(Default, Clone)]
 pub struct Ring {
@@ -50,6 +51,16 @@ impl Ring {
             return false;
         }
         self.coefficients[1..].iter().all(|x| *x == 0) && !self.coefficients[0] == 0
+    }
+
+    pub fn encode(&self, d: usize) -> Vec<u8> {
+        let mut t = BigUint::zero();
+        for i in 0..255 {
+            t |= BigUint::from(self.coefficients[256 - i - 1]);
+            t <<= d
+        }
+        t |= BigUint::from(self.coefficients[0]);
+        t.to_bytes_le()[0..(32 * d)].to_vec()
     }
 
     pub fn ntt_sample(&self, input_bytes: &[u8]) -> Self {
@@ -137,63 +148,30 @@ impl Add for &Ring {
     }
 }
 
+impl AddAssign for Ring {
+    fn add_assign(&mut self, rhs: Self) {
+        let new_ring = &*self + &rhs;
+        *self = new_ring;
+    }
+}
+
 impl Mul for &Ring {
     type Output = Ring;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        todo!()
+        let mut new_coeffs = vec![0; self.n];
+        let n = self.n;
+        for i in 0..n {
+            for j in 0..(n - i) {
+                new_coeffs[i + j] += self.coefficients[i] * rhs.coefficients[j];
+            }
+        }
+        for j in 1..n {
+            for i in (n - j)..n {
+                new_coeffs[i + j - n] -= self.coefficients[i] * rhs.coefficients[j]
+            }
+        }
+        new_coeffs = new_coeffs.iter().map(|x| x % self.q).collect();
+        Ring::new(&new_coeffs)
     }
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-
-//     #[test]
-//     fn new() {
-//         let q = BigInt::from(7);
-//         let n = BigInt::from(256);
-//         let coefficients = vec![BigInt::from(1), BigInt::from(2)];
-//         let poly_ring = PolynomialRing::new(q.clone(), n.clone(), &coefficients);
-//         assert_eq!(poly_ring.q, q);
-//         assert_eq!(poly_ring.n, n);
-//         assert_eq!(poly_ring.coefficients, coefficients);
-//     }
-
-//     #[test]
-//     fn is_zero() {
-//         let q = BigInt::from(7);
-//         let n = BigInt::from(256);
-//         let coefficients = vec![BigInt::from(1), BigInt::from(2)];
-//         let poly_ring = PolynomialRing::new(q.clone(), n.clone(), &coefficients);
-//         assert!(!poly_ring.is_zero());
-//         let coefficients = vec![BigInt::zero(), BigInt::from(2)];
-//         let poly_ring = PolynomialRing::new(q.clone(), n.clone(), &coefficients);
-//         assert!(!poly_ring.is_zero());
-//         let coefficients = vec![BigInt::zero(), BigInt::zero()];
-//         let poly_ring = PolynomialRing::new(q.clone(), n.clone(), &coefficients);
-//         assert!(poly_ring.is_zero());
-//         let poly_ring = PolynomialRing::new(q, n, &vec![]);
-//         assert!(poly_ring.is_zero());
-//     }
-
-//     #[test]
-//     fn is_constant() {
-//         let q = BigInt::from(7);
-//         let n = BigInt::from(256);
-//         let coefficients = vec![BigInt::from(1), BigInt::from(2)];
-//         let poly_ring = PolynomialRing::new(q.clone(), n.clone(), &coefficients);
-//         assert!(!poly_ring.is_constant());
-//         let coefficients = vec![BigInt::zero(), BigInt::from(2)];
-//         let poly_ring = PolynomialRing::new(q.clone(), n.clone(), &coefficients);
-//         assert!(!poly_ring.is_constant());
-//         let coefficients = vec![BigInt::zero(), BigInt::zero()];
-//         let poly_ring = PolynomialRing::new(q.clone(), n.clone(), &coefficients);
-//         assert!(!poly_ring.is_constant());
-//         let poly_ring = PolynomialRing::new(q.clone(), n.clone(), &vec![]);
-//         assert!(!poly_ring.is_constant());
-//         let coefficients = vec![BigInt::one(), BigInt::zero()];
-//         let poly_ring = PolynomialRing::new(q, n, &coefficients);
-//         assert!(poly_ring.is_constant());
-//     }
-// }
