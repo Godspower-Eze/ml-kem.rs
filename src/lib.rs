@@ -192,16 +192,44 @@ impl MLKEM {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
+    use std::fs;
 
-    #[test]
-    fn random_bytes() {
-        let bytes = MLKEM::random_bytes(32);
+    fn keygen_kat(_type: TYPE) {
+        let data =
+            fs::read_to_string("assets/ML-KEM-keyGen-FIPS203/internalProjection.json").unwrap();
+        let json: Value = serde_json::from_str(&data).unwrap();
+        match _type {
+            TYPE::ML_KEM_512 => {
+                let tests = json["testGroups"][0]["tests"].as_array().unwrap();
+                for value in tests {
+                    let z = &value["z"];
+                    let d = &value["d"];
+                    let ek = &value["ek"];
+                    let dk = &value["dk"];
+
+                    let z_as_bytes = hex::decode(z.as_str().unwrap()).unwrap();
+                    let d_as_bytes = hex::decode(d.as_str().unwrap()).unwrap();
+
+                    let ml_kem_512 = MLKEM::new(TYPE::ML_KEM_512);
+
+                    let (ek, dk) = ml_kem_512._keygen_internal(&d_as_bytes, &z_as_bytes);
+
+                    println!("{:?} {:?}", ek, dk);
+                }
+            }
+            TYPE::ML_KEM_768 => {
+                let tests = &json["testGroups"][1]["tests"];
+            }
+            TYPE::ML_KEM_1024 => {
+                let tests = &json["testGroups"][2]["tests"];
+            }
+        }
+        todo!()
     }
 
     #[test]
-    fn _G() {
-        let bytes = MLKEM::random_bytes(32);
-        let hash = MLKEM::_H(&bytes);
-        println!("{:?}", hash);
+    fn test_keygen_using_kat() {
+        keygen_kat(TYPE::ML_KEM_512)
     }
 }

@@ -6,14 +6,14 @@ use std::ops::{Add, AddAssign, Mul};
 pub struct Ring {
     q: usize,
     n: usize,
-    coefficients: Vec<usize>,
+    coefficients: Vec<BigUint>,
     root_of_unity: u8,
     ntt_zetas: Vec<usize>,
     ntt_f: usize,
 }
 
 impl Ring {
-    pub fn new(coefficients: &Vec<usize>) -> Self {
+    pub fn new(coefficients: &Vec<BigUint>) -> Self {
         Ring {
             q: 3329,
             n: 256,
@@ -34,39 +34,24 @@ impl Ring {
         }
     }
 
-    fn is_zero(&self) -> bool {
-        // Return if the polynomial ring is zero: f = 0
-        self.coefficients.iter().all(|x| *x == 0)
-    }
-
-    fn add_mod_q(&self, x: usize, y: usize) -> usize {
+    fn add_mod_q(&self, x: &BigUint, y: &BigUint) -> BigUint {
         (x + y) % self.q
-    }
-
-    fn is_constant(&self) -> bool {
-        // Return if the polynomial ring is constant: f = c
-        //
-        // Note: For simplicity, we don't consider zero polynomial a constant. That is [0] or [0, 0] is not a constant polynomial ring
-        if self.coefficients.is_empty() {
-            return false;
-        }
-        self.coefficients[1..].iter().all(|x| *x == 0) && !self.coefficients[0] == 0
     }
 
     pub fn encode(&self, d: usize) -> Vec<u8> {
         let mut t = BigUint::zero();
         for i in 0..255 {
-            t |= BigUint::from(self.coefficients[256 - i - 1]);
+            t |= &self.coefficients[256 - i - 1];
             t <<= d
         }
-        t |= BigUint::from(self.coefficients[0]);
+        t |= &self.coefficients[0];
         t.to_bytes_le()[0..(32 * d)].to_vec()
     }
 
     pub fn ntt_sample(&self, input_bytes: &[u8]) -> Self {
         let mut i = 0;
         let mut j = 0;
-        let mut coefficients = vec![0; self.n];
+        let mut coefficients = vec![BigUint::zero(); self.n];
         while j < self.n {
             let a: usize = input_bytes[i].into();
             let b: usize = input_bytes[i + 1].into();
@@ -76,12 +61,12 @@ impl Ring {
             let d_2 = (b / 16) + (16 * d);
 
             if d_1 < 3329 {
-                coefficients[j] = d_1;
+                coefficients[j] = BigUint::from(d_1);
                 j = j + 1
             }
 
             if d_2 < 3329 && j < self.n {
-                coefficients[j] = d_2;
+                coefficients[j] = BigUint::from(d_2);
                 j = j + 1
             }
 
@@ -95,7 +80,7 @@ impl Ring {
         if valid_byte_len != input_bytes.len() {
             return Err(String::from("Invalid byte length"));
         }
-        let mut coefficients = vec![0_usize; 256];
+        let mut coefficients = vec![BigUint::zero(); 256];
         let mut b_int = BigUint::from_bytes_le(input_bytes);
         let mask_1: usize = (1 << eta) - 1;
         let mask_2: usize = (1 << 2 * eta) - 1;
@@ -106,8 +91,8 @@ impl Ring {
             let b = (x >> eta) & BigUint::from(mask_1);
             let one_bits_in_b: i128 = b.count_ones().into();
             b_int >>= 2 * eta;
-            let value = (one_bits_in_a - one_bits_in_b) % 3329;
-            coefficients[i] = value.try_into().unwrap();
+            let value = (((one_bits_in_a - one_bits_in_b) % 3329) + 3329) % 3329;
+            coefficients[i] = BigUint::from(value as u128);
         }
         Ok(Ring::new(&coefficients))
     }
@@ -123,9 +108,9 @@ impl Ring {
                 let zeta = zetas[k];
                 k = k + 1;
                 for j in start..(start + l) {
-                    let t = zeta * coefficients[j + l];
-                    coefficients[j + l] = coefficients[j] - t;
-                    coefficients[j] = coefficients[j] + t;
+                    let t = zeta * &coefficients[j + l];
+                    coefficients[j + l] = &coefficients[j] - t.clone();
+                    coefficients[j] = &coefficients[j] + t;
                 }
                 start = start + (2 * l);
             }
@@ -142,7 +127,7 @@ impl Add for &Ring {
         // TODO: Add checks
         let mut new_coeffs = vec![];
         for (x, y) in self.coefficients.iter().zip(rhs.coefficients.iter()) {
-            new_coeffs.push(self.add_mod_q(*x, *y));
+            new_coeffs.push(self.add_mod_q(x, y));
         }
         Ring::new(&new_coeffs)
     }
@@ -159,16 +144,16 @@ impl Mul for &Ring {
     type Output = Ring;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        let mut new_coeffs = vec![0; self.n];
+        let mut new_coeffs = vec![BigUint::zero(); self.n];
         let n = self.n;
         for i in 0..n {
             for j in 0..(n - i) {
-                new_coeffs[i + j] += self.coefficients[i] * rhs.coefficients[j];
+                new_coeffs[i + j] += &self.coefficients[i] * &rhs.coefficients[j];
             }
         }
         for j in 1..n {
             for i in (n - j)..n {
-                new_coeffs[i + j - n] -= self.coefficients[i] * rhs.coefficients[j]
+                new_coeffs[i + j - n] -= &self.coefficients[i] * &rhs.coefficients[j]
             }
         }
         new_coeffs = new_coeffs.iter().map(|x| x % self.q).collect();
