@@ -1,6 +1,9 @@
 use num_bigint::BigUint;
 use num_traits::Zero;
-use std::ops::{Add, AddAssign, Mul};
+use std::{
+    fmt::{write, Debug},
+    ops::{Add, AddAssign, Mul},
+};
 
 #[derive(Default, Clone)]
 pub struct Ring {
@@ -109,8 +112,10 @@ impl Ring {
                 k = k + 1;
                 for j in start..(start + l) {
                     let t = zeta * &coefficients[j + l];
-                    coefficients[j + l] = &coefficients[j] - t.clone();
-                    coefficients[j] = &coefficients[j] + t;
+                    let first = &coefficients[j] + self.q;
+                    let second = t.clone() % self.q;
+                    coefficients[j + l] = (first - second) % self.q;
+                    coefficients[j] = (&coefficients[j] + t) % self.q;
                 }
                 start = start + (2 * l);
             }
@@ -158,5 +163,24 @@ impl Mul for &Ring {
         }
         new_coeffs = new_coeffs.iter().map(|x| x % self.q).collect();
         Ring::new(&new_coeffs)
+    }
+}
+
+impl Debug for Ring {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (i, value) in self.coefficients.iter().enumerate() {
+            if !value.is_zero() {
+                if i == 255 {
+                    write!(f, "{}x^{}", value, i)?;
+                } else if i == 0 {
+                    write!(f, "{} + ", value)?;
+                } else if i == 1 {
+                    write!(f, "{}x + ", value)?;
+                } else {
+                    write!(f, "{}x^{} + ", value, i)?;
+                }
+            }
+        }
+        write!(f, "")
     }
 }

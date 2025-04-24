@@ -98,9 +98,11 @@ impl MLKEM {
 
         let n = 0;
 
-        let (s, N) = self._generate_error_vector(&sigma, self.eta_1, n);
+        let (s, n) = self._generate_error_vector(&sigma, self.eta_1, n);
 
-        let (e, N) = self._generate_error_vector(&sigma, self.eta_1, N);
+        println!("{}", n);
+
+        let (e, _) = self._generate_error_vector(&sigma, self.eta_1, n);
 
         let s_hat = s.to_ntt();
 

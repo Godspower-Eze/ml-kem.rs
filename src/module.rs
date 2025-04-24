@@ -1,4 +1,4 @@
-use std::ops::Add;
+use std::{fmt::Debug, ops::Add};
 
 use crate::ring::Ring;
 
@@ -34,7 +34,7 @@ impl Module {
         Ok(Module::new(&new_data, false))
     }
 
-    fn dim(&self) -> (usize, usize) {
+    pub fn dim(&self) -> (usize, usize) {
         if self.transpose {
             return (self.data[0].len(), self.data.len());
         } else {
@@ -82,5 +82,15 @@ impl Add for &Module {
             new_data.push(new_row);
         }
         Module::new(&new_data, false)
+    }
+}
+
+impl Debug for Module {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[")?;
+        for row in self.data.iter() {
+            write!(f, "{:?}", row)?;
+        }
+        write!(f, "]")
     }
 }
