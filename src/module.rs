@@ -1,4 +1,10 @@
-use std::{fmt::Debug, ops::Add};
+use std::{
+    fmt::Debug,
+    ops::{Add, Index},
+};
+
+use num_bigint::BigUint;
+use num_traits::Zero;
 
 use crate::ring::Ring;
 
@@ -23,11 +29,11 @@ impl Module {
         if n_1 != m_2 {
             return Err(String::from("Invalid dimensions"));
         }
-        let mut new_data: Vec<Vec<Ring>> = vec![];
+        let mut new_data = vec![vec![Ring::new(&vec![BigUint::zero(); 256]); n_2]; m_1];
         for i in 0..m_1 {
             for j in 0..n_2 {
                 for k in 0..n_1 {
-                    new_data[i][j] += &self.data[i][k] * &rhs.data[k][j]
+                    new_data[i][j] += &self[(i, k)] * &rhs[(k, j)];
                 }
             }
         }
@@ -64,6 +70,10 @@ impl Module {
         }
         output
     }
+
+    pub fn transpose(&self) -> bool {
+        self.transpose
+    }
 }
 
 impl Add for &Module {
@@ -72,11 +82,11 @@ impl Add for &Module {
     fn add(self, rhs: Self) -> Self::Output {
         // TODO: Add checks
         let (m, n) = self.dim();
-        let mut new_data = vec![vec![Ring::default(); n]; m];
+        let mut new_data = vec![];
         for i in 0..m {
             let mut new_row = vec![];
             for j in 0..n {
-                let new_element = &self.data[i][j] + &rhs.data[i][j];
+                let new_element = &self[(i, j)] + &rhs[(i, j)];
                 new_row.push(new_element);
             }
             new_data.push(new_row);
@@ -92,5 +102,17 @@ impl Debug for Module {
             write!(f, "{:?}", row)?;
         }
         write!(f, "]")
+    }
+}
+
+impl Index<(usize, usize)> for Module {
+    type Output = Ring;
+
+    fn index(&self, index: (usize, usize)) -> &Self::Output {
+        if self.transpose {
+            &self.data[index.1][index.0]
+        } else {
+            &self.data[index.0][index.1]
+        }
     }
 }

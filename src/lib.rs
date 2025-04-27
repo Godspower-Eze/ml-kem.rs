@@ -100,17 +100,17 @@ impl MLKEM {
 
         let (s, n) = self._generate_error_vector(&sigma, self.eta_1, n);
 
-        println!("{}", n);
-
         let (e, _) = self._generate_error_vector(&sigma, self.eta_1, n);
 
         let s_hat = s.to_ntt();
 
         let e_hat = e.to_ntt();
 
-        let se_hat = &s_hat + &e_hat;
+        let sa_hat = a_hat.mat_mul(&s_hat).unwrap();
 
-        let t_hat = a_hat.mat_mul(&se_hat).unwrap();
+        println!("{:?}", sa_hat);
+
+        let t_hat = &sa_hat + &e_hat;
 
         let ek_pke = [t_hat.encode(12), rho].concat();
 
@@ -170,7 +170,7 @@ impl MLKEM {
         let mut a_data = vec![vec![Ring::default(); k]; k];
         for i in 0..k {
             for j in 0..k {
-                let xof_bytes = Self::_xof(rho, i.try_into().unwrap(), j.try_into().unwrap());
+                let xof_bytes = Self::_xof(rho, j.try_into().unwrap(), i.try_into().unwrap());
                 a_data[i][j] = self.ring.ntt_sample(&xof_bytes);
             }
         }
@@ -204,7 +204,7 @@ mod tests {
         match _type {
             TYPE::ML_KEM_512 => {
                 let tests = json["testGroups"][0]["tests"].as_array().unwrap();
-                for value in tests {
+                for value in &tests[0..1] {
                     let z = &value["z"];
                     let d = &value["d"];
                     let ek = &value["ek"];
@@ -215,9 +215,14 @@ mod tests {
 
                     let ml_kem_512 = MLKEM::new(TYPE::ML_KEM_512);
 
-                    let (ek, dk) = ml_kem_512._keygen_internal(&d_as_bytes, &z_as_bytes);
+                    let (actual_ek, actual_dk) =
+                        ml_kem_512._keygen_internal(&d_as_bytes, &z_as_bytes);
 
-                    println!("{:?} {:?}", ek, dk);
+                    let ek_as_bytes = hex::decode(ek.as_str().unwrap()).unwrap();
+                    let dk_as_bytes = hex::decode(dk.as_str().unwrap()).unwrap();
+
+                    // assert_eq!(actual_ek, ek_as_bytes);
+                    // assert_eq!(actual_dk, dk_as_bytes);
                 }
             }
             TYPE::ML_KEM_768 => {

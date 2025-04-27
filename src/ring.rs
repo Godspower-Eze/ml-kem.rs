@@ -154,14 +154,16 @@ impl Mul for &Ring {
         for i in 0..n {
             for j in 0..(n - i) {
                 new_coeffs[i + j] += &self.coefficients[i] * &rhs.coefficients[j];
+                new_coeffs[i + j] %= self.q
             }
         }
         for j in 1..n {
             for i in (n - j)..n {
-                new_coeffs[i + j - n] -= &self.coefficients[i] * &rhs.coefficients[j]
+                new_coeffs[i + j - n] += self.q;
+                new_coeffs[i + j - n] -= (&self.coefficients[i] * &rhs.coefficients[j]) % self.q;
+                new_coeffs[i + j - n] %= self.q
             }
         }
-        new_coeffs = new_coeffs.iter().map(|x| x % self.q).collect();
         Ring::new(&new_coeffs)
     }
 }
