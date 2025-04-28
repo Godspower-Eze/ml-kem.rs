@@ -1,5 +1,6 @@
 use num_bigint::BigUint;
 use num_traits::Zero;
+use rand::Rng;
 use std::{
     fmt::{write, Debug},
     ops::{Add, AddAssign, Mul},
@@ -39,6 +40,16 @@ impl Ring {
 
     fn add_mod_q(&self, x: &BigUint, y: &BigUint) -> BigUint {
         (x + y) % self.q
+    }
+
+    pub fn random() -> Self {
+        let mut rng = rand::thread_rng();
+        let mut coefficients = vec![];
+        for _ in 0..256 {
+            let random_number: usize = rng.gen_range(0..=255);
+            coefficients.push(BigUint::from(random_number));
+        }
+        Self::new(&coefficients)
     }
 
     pub fn encode(&self, d: usize) -> Vec<u8> {
@@ -117,7 +128,7 @@ impl Ring {
                     coefficients[j + l] = (first - second) % self.q;
                     coefficients[j] = (&coefficients[j] + t) % self.q;
                 }
-                start = start + (2 * l);
+                start += 2 * l;
             }
             l = l >> 1;
         }
@@ -184,5 +195,39 @@ impl Debug for Ring {
             }
         }
         write!(f, "")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use num_bigint::BigUint;
+    use num_traits::{One, Zero};
+
+    use super::Ring;
+
+    #[test]
+    fn multiplication() {
+        let mut co_effs_ring_1 = vec![
+            BigUint::zero(),
+            BigUint::one(),
+            BigUint::from(2_usize),
+            BigUint::from(3_usize),
+        ];
+        co_effs_ring_1.resize(256, BigUint::zero());
+        let ring_1 = Ring::new(&co_effs_ring_1);
+        let mut co_effs_ring_2 = vec![
+            BigUint::zero(),
+            BigUint::from(4_usize),
+            BigUint::from(5_usize),
+            BigUint::from(6_usize),
+        ];
+        co_effs_ring_2.resize(256, BigUint::zero());
+        let ring_2 = Ring::new(&co_effs_ring_2);
+        let new_ring = &ring_1 * &ring_2;
+        println!("{:?}", new_ring.coefficients);
+        let mut ring_3 = Ring::new(&vec![BigUint::one(); 256]);
+        ring_3 += new_ring;
+
+        println!("{:?}", ring_3);
     }
 }

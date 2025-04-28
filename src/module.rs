@@ -22,6 +22,18 @@ impl Module {
         }
     }
 
+    pub fn random(m: usize, n: usize) -> Self {
+        let mut data = vec![];
+        for _ in 0..m {
+            let mut row = vec![];
+            for _ in 0..n {
+                row.push(Ring::random());
+            }
+            data.push(row);
+        }
+        Self::new(&data, false)
+    }
+
     pub fn mat_mul(&self, rhs: &Self) -> Result<Self, String> {
         // TODO: Add checks
         let (m_1, n_1) = self.dim();
@@ -115,4 +127,10 @@ impl Index<(usize, usize)> for Module {
             &self.data[index.0][index.1]
         }
     }
+}
+
+mod tests {
+
+    #[test]
+    fn multiplication() {}
 }
