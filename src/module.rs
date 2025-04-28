@@ -3,12 +3,9 @@ use std::{
     ops::{Add, Index},
 };
 
-use num_bigint::BigUint;
-use num_traits::Zero;
-
 use crate::ring::Ring;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Module {
     data: Vec<Vec<Ring>>,
     transpose: bool,
@@ -41,11 +38,11 @@ impl Module {
         if n_1 != m_2 {
             return Err(String::from("Invalid dimensions"));
         }
-        let mut new_data = vec![vec![Ring::new(&vec![BigUint::zero(); 256]); n_2]; m_1];
+        let mut new_data = vec![vec![Ring::zero(); n_2]; m_1];
         for i in 0..m_1 {
             for j in 0..n_2 {
                 for k in 0..n_1 {
-                    new_data[i][j] += &self[(i, k)] * &rhs[(k, j)];
+                    new_data[i][j] += (&self[(i, k)] * &rhs[(k, j)]).unwrap();
                 }
             }
         }
@@ -130,7 +127,58 @@ impl Index<(usize, usize)> for Module {
 }
 
 mod tests {
+    use crate::ring::Ring;
+
+    use super::Module;
 
     #[test]
-    fn multiplication() {}
+    #[ignore]
+    fn mat_mul() {
+        // Square
+        let zero = Ring::zero();
+        let one = Ring::one();
+        let zero_module = Module::new(
+            &vec![
+                vec![zero.clone(), zero.clone()],
+                vec![zero.clone(), zero.clone()],
+            ],
+            false,
+        );
+        let identity_module = Module::new(
+            &vec![vec![one.clone(), zero.clone()], vec![zero.clone(), one]],
+            false,
+        );
+        for _ in 0..10 {
+            let a = Module::random(2, 2);
+            let b = Module::random(2, 2);
+            let c = Module::random(2, 2);
+            let random_ring = Ring::random();
+            let d = Module::new(
+                &vec![
+                    vec![random_ring.clone(), zero.clone()],
+                    vec![zero.clone(), random_ring],
+                ],
+                false,
+            );
+            assert_eq!(a.mat_mul(&zero_module).unwrap(), zero_module);
+            assert_eq!(a.mat_mul(&identity_module).unwrap(), a);
+            assert_eq!(a.mat_mul(&d), d.mat_mul(&a));
+            assert_eq!(
+                a.mat_mul(&(&b + &c)).unwrap(),
+                &(a.mat_mul(&b).unwrap()) + &(a.mat_mul(&c).unwrap())
+            )
+        }
+
+        // Rectangle
+        for _ in 0..10 {
+            let a = Module::random(11, 4);
+            let b = Module::random(4, 3);
+            let c = Module::random(4, 3);
+
+            assert_eq!(
+                a.mat_mul(&(&b + &c)).unwrap(),
+                &(a.mat_mul(&b).unwrap()) + &(a.mat_mul(&c).unwrap())
+            );
+        }
+    }
 }

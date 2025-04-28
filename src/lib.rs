@@ -25,12 +25,10 @@ struct MLKEM {
     eta_2: u8,
     du: u8,
     dv: u8,
-    ring: Ring,
 }
 
 impl MLKEM {
-    fn new(type_of: TYPE) -> Self {
-        let ring = Ring::new(&vec![]);
+    pub fn new(type_of: TYPE) -> Self {
         match type_of {
             TYPE::ML_KEM_512 => MLKEM {
                 k: 2,
@@ -38,7 +36,6 @@ impl MLKEM {
                 eta_2: 2,
                 du: 10,
                 dv: 4,
-                ring,
             },
             TYPE::ML_KEM_768 => MLKEM {
                 k: 3,
@@ -46,15 +43,13 @@ impl MLKEM {
                 eta_2: 2,
                 du: 10,
                 dv: 4,
-                ring,
             },
             TYPE::ML_KEM_1024 => MLKEM {
-                k: 2,
+                k: 4,
                 eta_1: 2,
                 eta_2: 2,
                 du: 11,
                 dv: 5,
-                ring,
             },
         }
     }
@@ -107,8 +102,6 @@ impl MLKEM {
         let e_hat = e.to_ntt();
 
         let sa_hat = a_hat.mat_mul(&s_hat).unwrap();
-
-        println!("{:?}", sa_hat);
 
         let t_hat = &sa_hat + &e_hat;
 
@@ -171,7 +164,7 @@ impl MLKEM {
         for i in 0..k {
             for j in 0..k {
                 let xof_bytes = Self::_xof(rho, j.try_into().unwrap(), i.try_into().unwrap());
-                a_data[i][j] = self.ring.ntt_sample(&xof_bytes);
+                a_data[i][j] = Ring::ntt_sample(&xof_bytes);
             }
         }
         Module::new(&a_data, transpose)
@@ -183,7 +176,7 @@ impl MLKEM {
         let mut n = n;
         for i in 0..k {
             let prf_output = Self::_prf(eta, sigma, n);
-            elements[i] = self.ring.cbd(&prf_output, eta).unwrap();
+            elements[i] = Ring::cbd(&prf_output, eta, false).unwrap();
             n += 1;
         }
         let data = vec![elements];
@@ -197,46 +190,35 @@ mod tests {
     use serde_json::Value;
     use std::fs;
 
-    fn keygen_kat(_type: TYPE) {
+    fn keygen_kat(_type: TYPE, index: usize) {
         let data =
             fs::read_to_string("assets/ML-KEM-keyGen-FIPS203/internalProjection.json").unwrap();
         let json: Value = serde_json::from_str(&data).unwrap();
-        match _type {
-            TYPE::ML_KEM_512 => {
-                let tests = json["testGroups"][0]["tests"].as_array().unwrap();
-                for value in &tests[0..1] {
-                    let z = &value["z"];
-                    let d = &value["d"];
-                    let ek = &value["ek"];
-                    let dk = &value["dk"];
+        let tests = json["testGroups"][index]["tests"].as_array().unwrap();
+        let ml_kem = MLKEM::new(_type);
+        for value in tests.iter() {
+            let z = &value["z"];
+            let d = &value["d"];
+            let ek = &value["ek"];
+            let dk = &value["dk"];
 
-                    let z_as_bytes = hex::decode(z.as_str().unwrap()).unwrap();
-                    let d_as_bytes = hex::decode(d.as_str().unwrap()).unwrap();
+            let z_as_bytes = hex::decode(z.as_str().unwrap()).unwrap();
+            let d_as_bytes = hex::decode(d.as_str().unwrap()).unwrap();
 
-                    let ml_kem_512 = MLKEM::new(TYPE::ML_KEM_512);
+            let (actual_ek, actual_dk) = ml_kem._keygen_internal(&d_as_bytes, &z_as_bytes);
 
-                    let (actual_ek, actual_dk) =
-                        ml_kem_512._keygen_internal(&d_as_bytes, &z_as_bytes);
+            let ek_as_bytes = hex::decode(ek.as_str().unwrap()).unwrap();
+            let dk_as_bytes = hex::decode(dk.as_str().unwrap()).unwrap();
 
-                    let ek_as_bytes = hex::decode(ek.as_str().unwrap()).unwrap();
-                    let dk_as_bytes = hex::decode(dk.as_str().unwrap()).unwrap();
-
-                    // assert_eq!(actual_ek, ek_as_bytes);
-                    // assert_eq!(actual_dk, dk_as_bytes);
-                }
-            }
-            TYPE::ML_KEM_768 => {
-                let tests = &json["testGroups"][1]["tests"];
-            }
-            TYPE::ML_KEM_1024 => {
-                let tests = &json["testGroups"][2]["tests"];
-            }
+            assert_eq!(actual_ek, ek_as_bytes);
+            assert_eq!(actual_dk, dk_as_bytes);
         }
-        todo!()
     }
 
     #[test]
     fn test_keygen_using_kat() {
-        keygen_kat(TYPE::ML_KEM_512)
+        // keygen_kat(TYPE::ML_KEM_512, 0);
+        keygen_kat(TYPE::ML_KEM_768, 1);
+        // keygen_kat(TYPE::ML_KEM_1024, 2);
     }
 }
