@@ -14,9 +14,9 @@ use sha3::{
 use ring::Ring;
 
 enum TYPE {
-    ML_KEM_512,
-    ML_KEM_768,
-    ML_KEM_1024,
+    MlKem512,
+    MlKem768,
+    MlKem1024,
 }
 
 struct MLKEM {
@@ -25,41 +25,36 @@ struct MLKEM {
     eta_2: u8,
     du: u8,
     dv: u8,
-    ring: Ring,
 }
 
 impl MLKEM {
-    fn new(type_of: TYPE) -> Self {
-        let ring = Ring::new(&vec![]);
+    pub fn new(type_of: TYPE) -> Self {
         match type_of {
-            TYPE::ML_KEM_512 => MLKEM {
+            TYPE::MlKem512 => MLKEM {
                 k: 2,
                 eta_1: 3,
                 eta_2: 2,
                 du: 10,
                 dv: 4,
-                ring,
             },
-            TYPE::ML_KEM_768 => MLKEM {
+            TYPE::MlKem768 => MLKEM {
                 k: 3,
                 eta_1: 2,
                 eta_2: 2,
                 du: 10,
                 dv: 4,
-                ring,
             },
-            TYPE::ML_KEM_1024 => MLKEM {
-                k: 2,
+            TYPE::MlKem1024 => MLKEM {
+                k: 4,
                 eta_1: 2,
                 eta_2: 2,
                 du: 11,
                 dv: 5,
-                ring,
             },
         }
     }
 
-    fn keygen(&self) -> (Vec<u8>, Vec<u8>) {
+    pub fn keygen(&self) -> (Vec<u8>, Vec<u8>) {
         let d = Self::random_bytes(32);
         let z = Self::random_bytes(32);
 
@@ -68,15 +63,15 @@ impl MLKEM {
         (ek, dk)
     }
 
-    fn key_derive(&self, seed: String) -> (String, String) {
+    fn key_derive(&self, seed: &[u8]) -> (Vec<u8>, Vec<u8>) {
         todo!()
     }
 
-    fn encaps(&self, ek: String) -> (String, String) {
+    fn encaps(&self, ek: &[u8]) -> (Vec<u8>, Vec<u8>) {
         todo!()
     }
 
-    fn decaps(&self, dk: String, c: String) -> String {
+    fn decaps(&self, dk: &[u8], c: &[u8]) -> Vec<u8> {
         todo!()
     }
 
@@ -84,7 +79,7 @@ impl MLKEM {
         let (ek_pke, dk_pke) = self._k_pke_keygen(d);
 
         let ek = ek_pke;
-        let dk = [dk_pke, ek.clone(), Self::_H(&ek), z.to_vec()].concat();
+        let dk = [dk_pke, ek.clone(), Self::_h(&ek), z.to_vec()].concat();
 
         (ek, dk)
     }
@@ -92,23 +87,23 @@ impl MLKEM {
     fn _k_pke_keygen(&self, d: &[u8]) -> (Vec<u8>, Vec<u8>) {
         let pre_image: Vec<u8> = [d, &[self.k]].concat();
 
-        let (rho, sigma) = Self::_G(&pre_image);
+        let (rho, sigma) = Self::_g(&pre_image);
 
         let a_hat = self._generate_matrix_from_seed(&rho, false);
 
         let n = 0;
 
-        let (s, N) = self._generate_error_vector(&sigma, self.eta_1, n);
+        let (s, n) = self._generate_error_vector(&sigma, self.eta_1, n);
 
-        let (e, N) = self._generate_error_vector(&sigma, self.eta_1, N);
+        let (e, _) = self._generate_error_vector(&sigma, self.eta_1, n);
 
         let s_hat = s.to_ntt();
 
         let e_hat = e.to_ntt();
 
-        let se_hat = &s_hat + &e_hat;
+        let sa_hat = a_hat.mat_mul(&s_hat).unwrap();
 
-        let t_hat = a_hat.mat_mul(&se_hat).unwrap();
+        let t_hat = &sa_hat + &e_hat;
 
         let ek_pke = [t_hat.encode(12), rho].concat();
 
@@ -123,14 +118,14 @@ impl MLKEM {
         bytes
     }
 
-    fn _G(s: &[u8]) -> (Vec<u8>, Vec<u8>) {
+    fn _g(s: &[u8]) -> (Vec<u8>, Vec<u8>) {
         let mut hasher = Sha3_512::new();
         Update::update(&mut hasher, s);
         let result = hasher.finalize();
         return (result[..32].to_vec(), result[32..].to_vec());
     }
 
-    fn _H(s: &[u8]) -> Vec<u8> {
+    fn _h(s: &[u8]) -> Vec<u8> {
         let mut hasher = Sha3_256::new();
         Update::update(&mut hasher, s);
         let result = hasher.finalize();
@@ -168,8 +163,8 @@ impl MLKEM {
         let mut a_data = vec![vec![Ring::default(); k]; k];
         for i in 0..k {
             for j in 0..k {
-                let xof_bytes = Self::_xof(rho, i.try_into().unwrap(), j.try_into().unwrap());
-                a_data[i][j] = self.ring.ntt_sample(&xof_bytes);
+                let xof_bytes = Self::_xof(rho, j.try_into().unwrap(), i.try_into().unwrap());
+                a_data[i][j] = Ring::ntt_sample(&xof_bytes);
             }
         }
         Module::new(&a_data, transpose)
@@ -181,7 +176,7 @@ impl MLKEM {
         let mut n = n;
         for i in 0..k {
             let prf_output = Self::_prf(eta, sigma, n);
-            elements[i] = self.ring.cbd(&prf_output, eta).unwrap();
+            elements[i] = Ring::cbd(&prf_output, eta, false).unwrap();
             n += 1;
         }
         let data = vec![elements];
@@ -192,16 +187,38 @@ impl MLKEM {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
+    use std::fs;
 
-    #[test]
-    fn random_bytes() {
-        let bytes = MLKEM::random_bytes(32);
+    fn keygen_kat(_type: TYPE, index: usize) {
+        let data =
+            fs::read_to_string("assets/ML-KEM-keyGen-FIPS203/internalProjection.json").unwrap();
+        let json: Value = serde_json::from_str(&data).unwrap();
+        let tests = json["testGroups"][index]["tests"].as_array().unwrap();
+        let ml_kem = MLKEM::new(_type);
+        for value in tests.iter() {
+            let z = &value["z"];
+            let d = &value["d"];
+            let ek = &value["ek"];
+            let dk = &value["dk"];
+
+            let z_as_bytes = hex::decode(z.as_str().unwrap()).unwrap();
+            let d_as_bytes = hex::decode(d.as_str().unwrap()).unwrap();
+
+            let (actual_ek, actual_dk) = ml_kem._keygen_internal(&d_as_bytes, &z_as_bytes);
+
+            let ek_as_bytes = hex::decode(ek.as_str().unwrap()).unwrap();
+            let dk_as_bytes = hex::decode(dk.as_str().unwrap()).unwrap();
+
+            assert_eq!(actual_ek, ek_as_bytes);
+            assert_eq!(actual_dk, dk_as_bytes);
+        }
     }
 
     #[test]
-    fn _G() {
-        let bytes = MLKEM::random_bytes(32);
-        let hash = MLKEM::_H(&bytes);
-        println!("{:?}", hash);
+    fn test_keygen_using_kat() {
+        keygen_kat(TYPE::MlKem512, 0);
+        keygen_kat(TYPE::MlKem768, 1);
+        keygen_kat(TYPE::MlKem1024, 2);
     }
 }
