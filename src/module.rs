@@ -57,6 +57,10 @@ impl Module {
         }
     }
 
+    pub fn dot(&self, rhs: &Self) -> Result<Ring, String> {
+        todo!()
+    }
+
     pub fn to_ntt(&self) -> Self {
         let mut data = vec![];
         for row in self.data.iter() {
@@ -69,6 +73,10 @@ impl Module {
         Module::new(&data, self.transpose)
     }
 
+    pub fn from_ntt(&self) -> Self {
+        todo!()
+    }
+
     pub fn encode(&self, d: usize) -> Vec<u8> {
         let mut output = vec![];
         for row in self.data.iter() {
@@ -78,6 +86,14 @@ impl Module {
             }
         }
         output
+    }
+
+    pub fn decode_vector(input_bytes: &[u8], k: usize, d: usize, is_ntt: bool) -> Self {
+        todo!()
+    }
+
+    pub fn compress(&self, d: u8) -> Self {
+        todo!()
     }
 
     pub fn transpose(&self) -> bool {

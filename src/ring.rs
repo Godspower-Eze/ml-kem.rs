@@ -83,6 +83,18 @@ impl Ring {
         encoding
     }
 
+    pub fn decode(input_bytes: &[u8], d: u8, is_ntt: bool) -> Result<Self, String> {
+        todo!()
+    }
+
+    pub fn compress(&self, d: u8) -> Self {
+        todo!()
+    }
+
+    pub fn decompress(&self, d: u8) -> Self {
+        todo!()
+    }
+
     pub fn ntt_sample(input_bytes: &[u8]) -> Self {
         let mut i = 0;
         let mut j = 0;
@@ -154,6 +166,10 @@ impl Ring {
             l = l >> 1;
         }
         Ring::new(&coefficients, true)
+    }
+
+    pub fn from_ntt(&self) -> Self {
+        todo!()
     }
 
     fn _ntt_base_mul(
