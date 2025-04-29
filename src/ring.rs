@@ -78,8 +78,9 @@ impl Ring {
             t <<= d
         }
         t |= &self.coefficients[0];
-        println!("{:?} {:?}", t.to_bytes_le(), t.to_bytes_le().len());
-        t.to_bytes_le()[..(32 * d)].to_vec()
+        let mut encoding = t.to_bytes_le();
+        encoding.resize(32 * d, 0);
+        encoding
     }
 
     pub fn ntt_sample(input_bytes: &[u8]) -> Self {
