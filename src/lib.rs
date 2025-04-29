@@ -88,7 +88,7 @@ impl MLKEM {
         }
         let t_hat_bytes = &ek_pke[..ek_pke.len() - 32];
         let rho = &ek_pke[ek_pke.len() - 32..];
-        let t_hat = Module::decode_vector(t_hat_bytes, self.k as usize, 12, true);
+        let t_hat = Module::decode_vector(t_hat_bytes, self.k as usize, 12, true)?;
         if t_hat.encode(12) != t_hat_bytes {
             return Err(String::from(
                 "Modulus check failed, t_hat does not encode correctly",
@@ -223,8 +223,10 @@ impl MLKEM {
         (Module::new(&data, true), n)
     }
 
-    fn _generate_polynomial(&self, igma: &[u8], eta: u8, n: u8) -> (Ring, u8) {
-        todo!()
+    fn _generate_polynomial(&self, sigma: &[u8], eta: u8, n: u8) -> (Ring, u8) {
+        let prf_output = Self::_prf(eta, sigma, n);
+        let p = Ring::cbd(&prf_output, eta, false).unwrap();
+        (p, n + 1)
     }
 }
 

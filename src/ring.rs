@@ -83,8 +83,27 @@ impl Ring {
         encoding
     }
 
-    pub fn decode(input_bytes: &[u8], d: u8, is_ntt: bool) -> Result<Self, String> {
-        todo!()
+    pub fn decode(input_bytes: &[u8], d: usize, is_ntt: bool) -> Result<Self, String> {
+        if 256 * (d as usize) != input_bytes.len() * 8 {
+            return Err(String::from(
+                "input bytes must be a multiple of (polynomial degree) / 8",
+            ));
+        }
+        let m: usize;
+        if d == 12 {
+            m = 3329
+        } else {
+            m = 1 << d;
+        }
+
+        let mut coefficients = vec![BigUint::zero(); 256];
+        let mut b_int = BigUint::from_bytes_le(input_bytes);
+        let mask = BigUint::from((1 << d) - 1 as usize);
+        for i in 0..256 {
+            coefficients[i] = (b_int.clone() & mask.clone()) % m;
+            b_int >>= d;
+        }
+        Ok(Ring::new(&coefficients, is_ntt))
     }
 
     pub fn compress(&self, d: u8) -> Self {
@@ -169,7 +188,33 @@ impl Ring {
     }
 
     pub fn from_ntt(&self) -> Self {
-        todo!()
+        let mut l = 2;
+        let l_upper = 128;
+        let mut k = l_upper - 1;
+        let mut coefficients = self.coefficients.clone();
+        let zetas = &self.ntt_zetas;
+        while l <= 128 {
+            let mut start = 0;
+            while start < 256 {
+                let zeta = zetas[k];
+                k = k - 1;
+                for j in start..(start + l) {
+                    let t = &coefficients[j];
+                    let a = &coefficients[j + l];
+                    coefficients[j] = t + a;
+                    let b = &coefficients[j + l];
+                    coefficients[j + l] = b - t;
+                    coefficients[j + l] = zeta * &coefficients[j + l];
+                }
+                start += 2 * l;
+            }
+            l = l << 1;
+        }
+        let f = self.ntt_f;
+        for j in 0..256 {
+            coefficients[j] = (&coefficients[j] * f) % self.q;
+        }
+        Ring::new(&coefficients, false)
     }
 
     fn _ntt_base_mul(

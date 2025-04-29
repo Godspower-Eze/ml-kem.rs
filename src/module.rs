@@ -74,7 +74,15 @@ impl Module {
     }
 
     pub fn from_ntt(&self) -> Self {
-        todo!()
+        let mut data = vec![];
+        for row in self.data.iter() {
+            let mut new_row = vec![];
+            for x in row {
+                new_row.push(x.from_ntt());
+            }
+            data.push(new_row);
+        }
+        Module::new(&data, self.transpose)
     }
 
     pub fn encode(&self, d: usize) -> Vec<u8> {
@@ -88,8 +96,24 @@ impl Module {
         output
     }
 
-    pub fn decode_vector(input_bytes: &[u8], k: usize, d: usize, is_ntt: bool) -> Self {
-        todo!()
+    pub fn decode_vector(
+        input_bytes: &[u8],
+        k: usize,
+        d: usize,
+        is_ntt: bool,
+    ) -> Result<Self, String> {
+        if (256 * d * k) != input_bytes.len() * 8 {
+            return Err(String::from(
+                "Byte length is the wrong length for given k, d values",
+            ));
+        }
+        let n = 32 * d;
+        let mut data = vec![];
+        for i in (0..input_bytes.len()).step_by(n) {
+            let ring = Ring::decode(&input_bytes[i..(i + n)], d, is_ntt).unwrap();
+            data.push(ring);
+        }
+        Ok(Module::new(&vec![data], true))
     }
 
     pub fn compress(&self, d: u8) -> Self {
