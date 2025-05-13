@@ -1,4 +1,4 @@
-use num_bigint::BigUint;
+use num_bigint::{BigInt, BigUint, ToBigInt};
 use num_traits::{One, Zero};
 use rand::Rng;
 use std::{
@@ -107,11 +107,31 @@ impl Ring {
     }
 
     pub fn compress(&self, d: u8) -> Self {
-        todo!()
+        let mut coefficients = vec![];
+        for element in self.coefficients.iter() {
+            coefficients.push(self.compress_ele(element.clone(), d));
+        }
+        Ring::new(&coefficients, self.is_ntt)
+    }
+
+    pub fn compress_ele(&self, x: BigUint, d: u8) -> BigUint {
+        let t: usize = 1 << d;
+        let y = (t * x + 1664_usize) / self.q;
+        y
     }
 
     pub fn decompress(&self, d: u8) -> Self {
-        todo!()
+        let mut coefficients = vec![];
+        for element in self.coefficients.iter() {
+            coefficients.push(self.decompress_ele(element.clone(), d));
+        }
+        Ring::new(&coefficients, self.is_ntt)
+    }
+
+    pub fn decompress_ele(&self, x: BigUint, d: u8) -> BigUint {
+        let t: usize = 1 << (d - 1);
+        let y = (self.q * x * t) >> d;
+        y
     }
 
     pub fn ntt_sample(input_bytes: &[u8]) -> Self {
@@ -199,20 +219,23 @@ impl Ring {
                 let zeta = zetas[k];
                 k = k - 1;
                 for j in start..(start + l) {
-                    let t = &coefficients[j];
-                    let a = &coefficients[j + l];
-                    coefficients[j] = t + a;
-                    let b = &coefficients[j + l];
-                    coefficients[j + l] = b - t;
-                    coefficients[j + l] = zeta * &coefficients[j + l];
+                    println!("{} {}", j, l);
+                    let t = &coefficients[j].clone();
+                    coefficients[j] = t + &coefficients[j + l];
+
+                    let a = self.ntt_f * zeta * &coefficients[j + l];
+                    let b = (self.ntt_f * zeta * t).to_bigint().unwrap();
+                    let c = a % self.q;
+                    let d = ((-b % self.q) + self.q) % self.q;
+                    let e = (c + d.to_biguint().unwrap()) % self.q;
+                    coefficients[j + l] = e;
+
+                    coefficients[j] *= self.ntt_f;
+                    coefficients[j] %= self.q;
                 }
                 start += 2 * l;
             }
             l = l << 1;
-        }
-        let f = self.ntt_f;
-        for j in 0..256 {
-            coefficients[j] = (&coefficients[j] * f) % self.q;
         }
         Ring::new(&coefficients, false)
     }

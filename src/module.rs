@@ -58,7 +58,14 @@ impl Module {
     }
 
     pub fn dot(&self, rhs: &Self) -> Result<Ring, String> {
-        todo!()
+        // TODO: Add checks
+        let transposed = Module::new(&self.data, !self.transpose);
+        let res = transposed.mat_mul(rhs).unwrap();
+        if res.dim() != (1, 1) {
+            return Err(String::from("Invalid response"));
+        } else {
+            return Ok(res[(0, 0)].clone());
+        }
     }
 
     pub fn to_ntt(&self) -> Self {
@@ -117,7 +124,16 @@ impl Module {
     }
 
     pub fn compress(&self, d: u8) -> Self {
-        todo!()
+        let mut new_data = vec![];
+        for row in self.data.iter() {
+            let mut new_row = vec![];
+            for ele in row {
+                let new_ele = ele.compress(d);
+                new_row.push(new_ele);
+            }
+            new_data.push(new_row);
+        }
+        Module::new(&new_data, self.transpose)
     }
 
     pub fn transpose(&self) -> bool {
