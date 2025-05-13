@@ -1,4 +1,4 @@
-use num_bigint::BigUint;
+use num_bigint::{BigInt, BigUint, ToBigInt};
 use num_traits::{One, Zero};
 use rand::Rng;
 use std::{
@@ -83,6 +83,57 @@ impl Ring {
         encoding
     }
 
+    pub fn decode(input_bytes: &[u8], d: usize, is_ntt: bool) -> Result<Self, String> {
+        if 256 * (d as usize) != input_bytes.len() * 8 {
+            return Err(String::from(
+                "input bytes must be a multiple of (polynomial degree) / 8",
+            ));
+        }
+        let m: usize;
+        if d == 12 {
+            m = 3329
+        } else {
+            m = 1 << d;
+        }
+
+        let mut coefficients = vec![BigUint::zero(); 256];
+        let mut b_int = BigUint::from_bytes_le(input_bytes);
+        let mask = BigUint::from((1 << d) - 1 as usize);
+        for i in 0..256 {
+            coefficients[i] = (b_int.clone() & mask.clone()) % m;
+            b_int >>= d;
+        }
+        Ok(Ring::new(&coefficients, is_ntt))
+    }
+
+    pub fn compress(&self, d: u8) -> Self {
+        let mut coefficients = vec![];
+        for element in self.coefficients.iter() {
+            coefficients.push(self.compress_ele(element.clone(), d));
+        }
+        Ring::new(&coefficients, self.is_ntt)
+    }
+
+    pub fn compress_ele(&self, x: BigUint, d: u8) -> BigUint {
+        let t: usize = 1 << d;
+        let y = (t * x + 1664_usize) / self.q;
+        y
+    }
+
+    pub fn decompress(&self, d: u8) -> Self {
+        let mut coefficients = vec![];
+        for element in self.coefficients.iter() {
+            coefficients.push(self.decompress_ele(element.clone(), d));
+        }
+        Ring::new(&coefficients, self.is_ntt)
+    }
+
+    pub fn decompress_ele(&self, x: BigUint, d: u8) -> BigUint {
+        let t: usize = 1 << (d - 1);
+        let y = (self.q * x * t) >> d;
+        y
+    }
+
     pub fn ntt_sample(input_bytes: &[u8]) -> Self {
         let mut i = 0;
         let mut j = 0;
@@ -154,6 +205,39 @@ impl Ring {
             l = l >> 1;
         }
         Ring::new(&coefficients, true)
+    }
+
+    pub fn from_ntt(&self) -> Self {
+        let mut l = 2;
+        let l_upper = 128;
+        let mut k = l_upper - 1;
+        let mut coefficients = self.coefficients.clone();
+        let zetas = &self.ntt_zetas;
+        while l <= 128 {
+            let mut start = 0;
+            while start < 256 {
+                let zeta = zetas[k];
+                k = k - 1;
+                for j in start..(start + l) {
+                    println!("{} {}", j, l);
+                    let t = &coefficients[j].clone();
+                    coefficients[j] = t + &coefficients[j + l];
+
+                    let a = self.ntt_f * zeta * &coefficients[j + l];
+                    let b = (self.ntt_f * zeta * t).to_bigint().unwrap();
+                    let c = a % self.q;
+                    let d = ((-b % self.q) + self.q) % self.q;
+                    let e = (c + d.to_biguint().unwrap()) % self.q;
+                    coefficients[j + l] = e;
+
+                    coefficients[j] *= self.ntt_f;
+                    coefficients[j] %= self.q;
+                }
+                start += 2 * l;
+            }
+            l = l << 1;
+        }
+        Ring::new(&coefficients, false)
     }
 
     fn _ntt_base_mul(
