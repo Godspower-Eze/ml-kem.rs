@@ -11,7 +11,7 @@ A rust library for ML-KEM(Module-Lattice-Based Key-Encryption Mechanism)
 ### Features
 
 - [x] `keygen()` - generate a key pair `(ek, dk)`
-- [ ] `encaps(ek)` - generate a key and ciphertext pair `(key, ciphertext)`
+- [x] `encaps(ek)` - generate a key and ciphertext pair `(key, ciphertext)`
 - [ ] `decaps(dk, ciphertext)`- generate the shared key `key`
 
 ### License

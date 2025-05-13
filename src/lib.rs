@@ -63,16 +63,56 @@ impl MLKEM {
         (ek, dk)
     }
 
-    fn key_derive(&self, seed: &[u8]) -> (Vec<u8>, Vec<u8>) {
-        todo!()
-    }
-
     fn encaps(&self, ek: &[u8]) -> (Vec<u8>, Vec<u8>) {
-        todo!()
+        let m = Self::random_bytes(32);
+        let (k, c) = self._encaps_internal(ek, &m);
+        (k, c)
     }
 
     fn decaps(&self, dk: &[u8], c: &[u8]) -> Vec<u8> {
         todo!()
+    }
+
+    fn _encaps_internal(&self, ek: &[u8], m: &[u8]) -> (Vec<u8>, Vec<u8>) {
+        let pre_image = [m, &Self::_h(ek)].concat();
+        let (k, r) = Self::_g(&pre_image);
+        let c = self._k_pke_encrypt(ek, m, &r).unwrap();
+        (k, c)
+    }
+
+    fn _k_pke_encrypt(&self, ek_pke: &[u8], m: &[u8], r: &[u8]) -> Result<Vec<u8>, String> {
+        if ek_pke.len() != 384 * (self.k as usize) + 32 {
+            return Err(String::from(
+                "Type check failed, ek_pke has the wrong length",
+            ));
+        }
+        let t_hat_bytes = &ek_pke[..ek_pke.len() - 32];
+        let rho = &ek_pke[ek_pke.len() - 32..];
+        let t_hat = Module::decode_vector(t_hat_bytes, self.k as usize, 12, true)?;
+        if t_hat.encode(12) != t_hat_bytes {
+            return Err(String::from(
+                "Modulus check failed, t_hat does not encode correctly",
+            ));
+        }
+        let a_hat_t = self._generate_matrix_from_seed(rho, true);
+
+        let n = 0;
+        let (y, n) = self._generate_error_vector(r, self.eta_1, n);
+        let (e_1, n) = self._generate_error_vector(r, self.eta_2, n);
+        let (e_2, n) = self._generate_polynomial(r, self.eta_2, n);
+
+        let y_hat = y.to_ntt();
+
+        let u = &((a_hat_t.mat_mul(&y_hat)?).from_ntt()) + &e_1;
+
+        let mu = Ring::decode(m, 1, false)?.decompress(1);
+
+        let v = &(t_hat.dot(&y_hat)?.from_ntt()) + &(&e_2 + &mu);
+
+        let c_1 = u.compress(self.du).encode(self.du as usize);
+        let c_2 = v.compress(self.dv).encode(self.dv as usize);
+
+        Ok([c_1, c_2].concat())
     }
 
     fn _keygen_internal(&self, d: &[u8], z: &[u8]) -> (Vec<u8>, Vec<u8>) {
@@ -181,6 +221,12 @@ impl MLKEM {
         }
         let data = vec![elements];
         (Module::new(&data, true), n)
+    }
+
+    fn _generate_polynomial(&self, sigma: &[u8], eta: u8, n: u8) -> (Ring, u8) {
+        let prf_output = Self::_prf(eta, sigma, n);
+        let p = Ring::cbd(&prf_output, eta, false).unwrap();
+        (p, n + 1)
     }
 }
 
