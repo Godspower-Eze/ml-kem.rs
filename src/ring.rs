@@ -219,7 +219,6 @@ impl Ring {
                 let zeta = zetas[k];
                 k = k - 1;
                 for j in start..(start + l) {
-                    println!("{} {}", j, l);
                     let t = &coefficients[j].clone();
                     coefficients[j] = t + &coefficients[j + l];
 
