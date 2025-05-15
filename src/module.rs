@@ -196,6 +196,9 @@ impl Index<(usize, usize)> for Module {
 }
 
 mod tests {
+    use crate::ring::Ring;
+
+    use super::Module;
 
     #[test]
     #[ignore]
