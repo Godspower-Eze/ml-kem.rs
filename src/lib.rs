@@ -70,7 +70,37 @@ impl MLKEM {
     }
 
     fn decaps(&self, dk: &[u8], c: &[u8]) -> Vec<u8> {
-        todo!()
+        let k_prime = self._decaps_internal(dk, c).unwrap();
+        k_prime
+    }
+
+    fn _decaps_internal(&self, dk: &[u8], c: &[u8]) -> Result<Vec<u8>, String> {
+        if c.len() != 32 * (self.du * self.k + self.dv) as usize {
+            return Err(String::from("ciphertext type check failed"));
+        }
+        if dk.len() != (768_usize * self.k as usize + 96) {
+            return Err(String::from("decapsulation key type check failed"));
+        }
+
+        let dk_pke = &dk[0..(384_usize * self.k as usize)];
+        let ek_pke = &dk[(384_usize * self.k as usize)..(768_usize * self.k as usize + 32)];
+        let h = &dk[(768_usize * self.k as usize + 32)..(768_usize * self.k as usize + 64)];
+        let z = &dk[(768_usize * self.k as usize + 64)..];
+
+        if Self::_h(ek_pke) != h {
+            return Err(String::from("hash check failed"));
+        }
+
+        let m_prime = self._k_pke_decrypt(dk_pke, c);
+
+        let pre_image = [m_prime.clone(), h.to_vec()].concat();
+        let (k_prime, r_prime) = Self::_g(&pre_image);
+        let pre_image = [z, c].concat();
+        let k_bar = Self::_j(&pre_image);
+
+        let c_prime = self._k_pke_encrypt(ek_pke, &m_prime, &r_prime).unwrap();
+
+        Ok(select_bytes(&k_bar, &k_prime, c == c_prime))
     }
 
     fn _encaps_internal(&self, ek: &[u8], m: &[u8]) -> (Vec<u8>, Vec<u8>) {
@@ -113,6 +143,24 @@ impl MLKEM {
         let c_2 = v.compress(self.dv).encode(self.dv as usize);
 
         Ok([c_1, c_2].concat())
+    }
+
+    fn _k_pke_decrypt(&self, dk_pke: &[u8], c: &[u8]) -> Vec<u8> {
+        let n = self.k as usize * self.du as usize * 32;
+        let c_1 = &c[..(n as usize)];
+        let c_2 = &c[(n as usize)..];
+        let u = Module::decode_vector(&c_1, self.k as usize, self.du as usize, false)
+            .unwrap()
+            .decompress(self.du);
+        let v = Ring::decode(&c_2, self.dv as usize, false)
+            .unwrap()
+            .decompress(self.dv);
+        let s_hat = Module::decode_vector(dk_pke, self.k as usize, 12, true).unwrap();
+
+        let u_hat = u.to_ntt();
+        let w = &v - &(s_hat.dot(&u_hat).unwrap()).from_ntt();
+        let m = w.compress(1).encode(1);
+        m
     }
 
     fn _keygen_internal(&self, d: &[u8], z: &[u8]) -> (Vec<u8>, Vec<u8>) {
@@ -170,6 +218,17 @@ impl MLKEM {
         Update::update(&mut hasher, s);
         let result = hasher.finalize();
         return result.to_vec();
+    }
+
+    fn _j(s: &[u8]) -> Vec<u8> {
+        let mut hasher = Shake256::default();
+        hasher.update(s);
+
+        let mut reader = hasher.finalize_xof();
+        let mut buf = [0u8; 32];
+        reader.read(&mut buf);
+
+        buf.to_vec()
     }
 
     fn _xof(b: &[u8], i: u8, j: u8) -> Vec<u8> {
@@ -230,6 +289,21 @@ impl MLKEM {
     }
 }
 
+fn select_bytes(a: &[u8], b: &[u8], cond: bool) -> Vec<u8> {
+    // TODO: Add checks
+    let mut out = vec![0_u8; a.len()];
+    let cw;
+    if cond == false {
+        cw = 0;
+    } else {
+        cw = 255;
+    }
+    for i in 0..(a.len()) {
+        out[i] = a[i] ^ (cw & (a[i] ^ b[i]))
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -287,8 +361,10 @@ mod tests {
 
             let dk_as_bytes = hex::decode(dk.as_str().unwrap()).unwrap();
 
-            // let k_prime = ml_kem.decaps(&dk_as_bytes, &c_as_bytes);
-            // assert_eq!(k_prime, k_as_bytes)
+            let k_prime = ml_kem.decaps(&dk_as_bytes, &c_as_bytes);
+            assert_eq!(k_prime, k_as_bytes);
+
+            break;
         }
     }
 
