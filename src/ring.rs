@@ -117,7 +117,7 @@ impl Ring {
     pub fn compress_ele(&self, x: BigUint, d: u8) -> BigUint {
         let t: usize = 1 << d;
         let y = (t * x + 1664_usize) / self.q;
-        y
+        y % t
     }
 
     pub fn decompress(&self, d: u8) -> Self {
@@ -130,7 +130,7 @@ impl Ring {
 
     pub fn decompress_ele(&self, x: BigUint, d: u8) -> BigUint {
         let t: usize = 1 << (d - 1);
-        let y = (self.q * x * t) >> d;
+        let y = (self.q * x + t) >> d;
         y
     }
 
@@ -219,23 +219,22 @@ impl Ring {
                 let zeta = zetas[k];
                 k = k - 1;
                 for j in start..(start + l) {
-                    println!("{} {}", j, l);
                     let t = &coefficients[j].clone();
                     coefficients[j] = t + &coefficients[j + l];
 
-                    let a = self.ntt_f * zeta * &coefficients[j + l];
-                    let b = (self.ntt_f * zeta * t).to_bigint().unwrap();
+                    let a = zeta * &coefficients[j + l];
+                    let b = (zeta * t).to_bigint().unwrap();
                     let c = a % self.q;
                     let d = ((-b % self.q) + self.q) % self.q;
                     let e = (c + d.to_biguint().unwrap()) % self.q;
                     coefficients[j + l] = e;
-
-                    coefficients[j] *= self.ntt_f;
-                    coefficients[j] %= self.q;
                 }
                 start += 2 * l;
             }
             l = l << 1;
+        }
+        for i in 0..256 {
+            coefficients[i] = (&coefficients[i] * self.ntt_f) % self.q
         }
         Ring::new(&coefficients, false)
     }
@@ -340,14 +339,26 @@ impl Debug for Ring {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (i, value) in self.coefficients.iter().enumerate() {
             if !value.is_zero() {
-                if i == 255 {
-                    write!(f, "{}x^{}", value, i)?;
-                } else if i == 0 {
-                    write!(f, "{} + ", value)?;
-                } else if i == 1 {
-                    write!(f, "{}x + ", value)?;
+                if value.is_one() {
+                    if i == 255 {
+                        write!(f, "x^{}", i)?;
+                    } else if i == 0 {
+                        write!(f, "{} + ", value)?;
+                    } else if i == 1 {
+                        write!(f, "x + ")?;
+                    } else {
+                        write!(f, "x^{} + ", i)?;
+                    }
                 } else {
-                    write!(f, "{}x^{} + ", value, i)?;
+                    if i == 255 {
+                        write!(f, "{}x^{}", value, i)?;
+                    } else if i == 0 {
+                        write!(f, "{} + ", value)?;
+                    } else if i == 1 {
+                        write!(f, "{}x + ", value)?;
+                    } else {
+                        write!(f, "{}x^{} + ", value, i)?;
+                    }
                 }
             }
         }
