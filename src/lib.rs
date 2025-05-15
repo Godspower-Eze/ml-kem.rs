@@ -28,7 +28,7 @@ pub struct MLKem {
 }
 
 impl MLKem {
-    pub fn new(type_of: Type) -> Self {
+    pub const fn new(type_of: Type) -> Self {
         match type_of {
             Type::MlKem512 => MLKem {
                 k: 2,
@@ -297,6 +297,10 @@ fn select_bytes(a: &[u8], b: &[u8], cond: bool) -> Vec<u8> {
     }
     out
 }
+
+pub const ML_KEM_512: MLKem = MLKem::new(Type::MlKem512);
+pub const ML_KEM_768: MLKem = MLKem::new(Type::MlKem768);
+pub const ML_KEM_1024: MLKem = MLKem::new(Type::MlKem1024);
 
 #[cfg(test)]
 mod tests {
