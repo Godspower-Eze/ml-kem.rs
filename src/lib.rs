@@ -335,7 +335,7 @@ mod tests {
         }
     }
 
-    fn encap_kat(_type: TYPE, index: usize) {
+    fn encaps_kat(_type: TYPE, index: usize) {
         let data =
             fs::read_to_string("assets/ML-KEM-encapDecap-FIPS203/internalProjection.json").unwrap();
         let json: Value = serde_json::from_str(&data).unwrap();
@@ -363,8 +363,24 @@ mod tests {
 
             let k_prime = ml_kem.decaps(&dk_as_bytes, &c_as_bytes);
             assert_eq!(k_prime, k_as_bytes);
+        }
+    }
 
-            break;
+    fn decaps_kat(_type: TYPE, index: usize) {
+        let data =
+            fs::read_to_string("assets/ML-KEM-encapDecap-FIPS203/internalProjection.json").unwrap();
+        let json: Value = serde_json::from_str(&data).unwrap();
+        let kat_data = json["testGroups"][3 + index]["tests"].as_array().unwrap();
+        let dk = json["testGroups"][3 + index]["dk"].as_str().unwrap();
+        let dk_as_bytes = hex::decode(dk).unwrap();
+        let ml_kem = MLKEM::new(_type);
+        for value in kat_data.iter() {
+            let c = &value["c"];
+            let c_as_bytes = hex::decode(c.as_str().unwrap()).unwrap();
+            let k = &value["k"];
+            let k_as_bytes = hex::decode(k.as_str().unwrap()).unwrap();
+            let k = ml_kem.decaps(&dk_as_bytes, &c_as_bytes);
+            assert_eq!(k, k_as_bytes)
         }
     }
 
@@ -376,9 +392,16 @@ mod tests {
     }
 
     #[test]
-    fn test_encap_using_kat() {
-        encap_kat(TYPE::MlKem512, 0);
-        encap_kat(TYPE::MlKem768, 1);
-        encap_kat(TYPE::MlKem1024, 2);
+    fn test_encaps_using_kat() {
+        encaps_kat(TYPE::MlKem512, 0);
+        encaps_kat(TYPE::MlKem768, 1);
+        encaps_kat(TYPE::MlKem1024, 2);
+    }
+
+    #[test]
+    fn test_decaps_using_kat() {
+        decaps_kat(TYPE::MlKem512, 0);
+        decaps_kat(TYPE::MlKem768, 1);
+        decaps_kat(TYPE::MlKem1024, 2);
     }
 }
