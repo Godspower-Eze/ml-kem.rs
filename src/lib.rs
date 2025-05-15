@@ -13,13 +13,13 @@ use sha3::{
 
 use ring::Ring;
 
-enum Type {
+pub enum Type {
     MlKem512,
     MlKem768,
     MlKem1024,
 }
 
-struct MLKem {
+pub struct MLKem {
     k: u8,
     eta_1: u8,
     eta_2: u8,
