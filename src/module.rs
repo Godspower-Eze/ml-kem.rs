@@ -136,6 +136,19 @@ impl Module {
         Module::new(&new_data, self.transpose)
     }
 
+    pub fn decompress(&self, d: u8) -> Self {
+        let mut new_data = vec![];
+        for row in self.data.iter() {
+            let mut new_row = vec![];
+            for ele in row {
+                let new_ele = ele.decompress(d);
+                new_row.push(new_ele);
+            }
+            new_data.push(new_row);
+        }
+        Module::new(&new_data, self.transpose)
+    }
+
     pub fn transpose(&self) -> bool {
         self.transpose
     }

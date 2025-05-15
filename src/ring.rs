@@ -3,7 +3,7 @@ use num_traits::{One, Zero};
 use rand::Rng;
 use std::{
     fmt::{write, Debug},
-    ops::{Add, AddAssign, Mul},
+    ops::{Add, AddAssign, Mul, Sub},
 };
 
 #[derive(Default, Clone, PartialEq)]
@@ -59,6 +59,13 @@ impl Ring {
 
     fn add_mod_q(&self, x: &BigUint, y: &BigUint) -> BigUint {
         (x + y) % self.q
+    }
+
+    fn sub_mod_q(&self, x: &BigUint, y: &BigUint) -> BigUint {
+        let x = x.to_bigint().unwrap();
+        let y = y.to_bigint().unwrap();
+        let out = (((x - y) % self.q) + self.q) % self.q;
+        out.to_biguint().unwrap()
     }
 
     pub fn random() -> Self {
@@ -301,6 +308,19 @@ impl AddAssign for Ring {
         // TODO: Add checks
         let new_ring = &*self + &rhs;
         *self = new_ring;
+    }
+}
+
+impl Sub for &Ring {
+    type Output = Ring;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        // TODO: Add checks
+        let mut new_coeffs = vec![];
+        for (x, y) in self.coefficients.iter().zip(rhs.coefficients.iter()) {
+            new_coeffs.push(self.sub_mod_q(x, y));
+        }
+        Ring::new(&new_coeffs, self.is_ntt)
     }
 }
 
