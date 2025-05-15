@@ -107,19 +107,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 
 [[package]]
-name = "ml_kem"
-version = "0.1.0"
-dependencies = [
- "hex",
- "num-bigint",
- "num-integer",
- "num-traits",
- "rand",
- "serde_json",
- "sha3",
-]
-
-[[package]]
 name = "num-bigint"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -154,6 +141,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85eae3c4ed2f50dcfe72643da4befc30deadb458a9b590d720cde2f2b1e97da9"
 dependencies = [
  "zerocopy",
+]
+
+[[package]]
+name = "pqc-ml-kem"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "num-bigint",
+ "num-integer",
+ "num-traits",
+ "rand",
+ "serde_json",
+ "sha3",
 ]
 
 [[package]]

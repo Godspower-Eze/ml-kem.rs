@@ -1,5 +1,5 @@
 [package]
-name = "ml_kem"
+name = "pqc-ml-kem"
 version = "0.1.0"
 edition = "2021"
 authors = ["Godspower Eze"]
