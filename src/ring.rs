@@ -1,8 +1,8 @@
-use num_bigint::{BigInt, BigUint, ToBigInt};
+use num_bigint::{BigUint, ToBigInt};
 use num_traits::{One, Zero};
 use rand::Rng;
 use std::{
-    fmt::{write, Debug},
+    fmt::Debug,
     ops::{Add, AddAssign, Mul, Sub},
 };
 
