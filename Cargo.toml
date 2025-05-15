@@ -7,7 +7,7 @@ description = "A library for Module-Lattice Key Encryption Mechanism (ML-KEM)"
 license = "MIT"
 repository = "https://github.com/Godspower-Eze/ml_kem.rs"
 readme = "README.md"
-keywords = ["cryptography", "lattice-based cryptography", "key encryption mechanism"]
+keywords = ["cryptography"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
