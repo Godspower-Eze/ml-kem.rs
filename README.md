@@ -14,6 +14,10 @@ A rust library for ML-KEM(Module-Lattice-Based Key-Encryption Mechanism)
 - [x] `encaps(ek)` - generate a key and ciphertext pair `(key, ciphertext)`
 - [x] `decaps(dk, ciphertext)`- generate the shared key `key`
 
+### Acknowledgements
+
+- [kyber.py](https://github.com/GiacomoPope/kyber-py) for serving as an initial reference.
+
 ### License
 
 This project is licensed under the MIT license.
