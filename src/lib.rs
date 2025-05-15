@@ -89,17 +89,17 @@ impl MLKEM {
         let t_hat_bytes = &ek_pke[..ek_pke.len() - 32];
         let rho = &ek_pke[ek_pke.len() - 32..];
         let t_hat = Module::decode_vector(t_hat_bytes, self.k as usize, 12, true)?;
+
         if t_hat.encode(12) != t_hat_bytes {
             return Err(String::from(
                 "Modulus check failed, t_hat does not encode correctly",
             ));
         }
         let a_hat_t = self._generate_matrix_from_seed(rho, true);
-
         let n = 0;
         let (y, n) = self._generate_error_vector(r, self.eta_1, n);
         let (e_1, n) = self._generate_error_vector(r, self.eta_2, n);
-        let (e_2, n) = self._generate_polynomial(r, self.eta_2, n);
+        let (e_2, _) = self._generate_polynomial(r, self.eta_2, n);
 
         let y_hat = y.to_ntt();
 
@@ -283,7 +283,12 @@ mod tests {
             let c_as_bytes = hex::decode(c.as_str().unwrap()).unwrap();
 
             assert_eq!(actual_k, k_as_bytes);
-            // assert_eq!(actual_c, c_as_bytes);
+            assert_eq!(actual_c, c_as_bytes);
+
+            let dk_as_bytes = hex::decode(dk.as_str().unwrap()).unwrap();
+
+            // let k_prime = ml_kem.decaps(&dk_as_bytes, &c_as_bytes);
+            // assert_eq!(k_prime, k_as_bytes)
         }
     }
 
@@ -297,5 +302,7 @@ mod tests {
     #[test]
     fn test_encap_using_kat() {
         encap_kat(TYPE::MlKem512, 0);
+        encap_kat(TYPE::MlKem768, 1);
+        encap_kat(TYPE::MlKem1024, 2);
     }
 }
