@@ -1,6 +1,6 @@
 ![Project Status](https://img.shields.io/badge/status-in--development-yellow)
 
-## ml-kem.rs
+## pqc-ml-kem.rs
 
 A rust library for ML-KEM(Module-Lattice-Based Key-Encryption Mechanism)
 
