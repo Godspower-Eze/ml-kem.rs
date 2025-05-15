@@ -1,7 +1,13 @@
 [package]
-name = "ml-kem"
+name = "ml_kem"
 version = "0.1.0"
 edition = "2021"
+authors = ["Godspower Eze"]
+description = "A library for Module-Lattice Key Encryption Mechanism (ML-KEM)"
+license = "MIT"
+repository = "https://github.com/Godspower-Eze/ml_kem.rs"
+readme = "README.md"
+keywords = ["cryptography", "lattice-based cryptography", "key encryption mechanism"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
