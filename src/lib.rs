@@ -13,13 +13,13 @@ use sha3::{
 
 use ring::Ring;
 
-enum TYPE {
+enum Type {
     MlKem512,
     MlKem768,
     MlKem1024,
 }
 
-struct MLKEM {
+struct MLKem {
     k: u8,
     eta_1: u8,
     eta_2: u8,
@@ -27,24 +27,24 @@ struct MLKEM {
     dv: u8,
 }
 
-impl MLKEM {
-    pub fn new(type_of: TYPE) -> Self {
+impl MLKem {
+    pub fn new(type_of: Type) -> Self {
         match type_of {
-            TYPE::MlKem512 => MLKEM {
+            Type::MlKem512 => MLKem {
                 k: 2,
                 eta_1: 3,
                 eta_2: 2,
                 du: 10,
                 dv: 4,
             },
-            TYPE::MlKem768 => MLKEM {
+            Type::MlKem768 => MLKem {
                 k: 3,
                 eta_1: 2,
                 eta_2: 2,
                 du: 10,
                 dv: 4,
             },
-            TYPE::MlKem1024 => MLKEM {
+            Type::MlKem1024 => MLKem {
                 k: 4,
                 eta_1: 2,
                 eta_2: 2,
@@ -63,15 +63,14 @@ impl MLKEM {
         (ek, dk)
     }
 
-    fn encaps(&self, ek: &[u8]) -> (Vec<u8>, Vec<u8>) {
+    pub fn encaps(&self, ek: &[u8]) -> (Vec<u8>, Vec<u8>) {
         let m = Self::random_bytes(32);
         let (k, c) = self._encaps_internal(ek, &m);
         (k, c)
     }
 
-    fn decaps(&self, dk: &[u8], c: &[u8]) -> Vec<u8> {
-        let k_prime = self._decaps_internal(dk, c).unwrap();
-        k_prime
+    pub fn decaps(&self, dk: &[u8], c: &[u8]) -> Vec<u8> {
+        self._decaps_internal(dk, c).unwrap()
     }
 
     fn _decaps_internal(&self, dk: &[u8], c: &[u8]) -> Result<Vec<u8>, String> {
@@ -147,20 +146,20 @@ impl MLKEM {
 
     fn _k_pke_decrypt(&self, dk_pke: &[u8], c: &[u8]) -> Vec<u8> {
         let n = self.k as usize * self.du as usize * 32;
-        let c_1 = &c[..(n as usize)];
-        let c_2 = &c[(n as usize)..];
-        let u = Module::decode_vector(&c_1, self.k as usize, self.du as usize, false)
+        let c_1 = &c[..n];
+        let c_2 = &c[n..];
+        let u = Module::decode_vector(c_1, self.k as usize, self.du as usize, false)
             .unwrap()
             .decompress(self.du);
-        let v = Ring::decode(&c_2, self.dv as usize, false)
+        let v = Ring::decode(c_2, self.dv as usize, false)
             .unwrap()
             .decompress(self.dv);
         let s_hat = Module::decode_vector(dk_pke, self.k as usize, 12, true).unwrap();
 
         let u_hat = u.to_ntt();
         let w = &v - &(s_hat.dot(&u_hat).unwrap()).from_ntt();
-        let m = w.compress(1).encode(1);
-        m
+
+        w.compress(1).encode(1)
     }
 
     fn _keygen_internal(&self, d: &[u8], z: &[u8]) -> (Vec<u8>, Vec<u8>) {
@@ -210,14 +209,14 @@ impl MLKEM {
         let mut hasher = Sha3_512::new();
         Update::update(&mut hasher, s);
         let result = hasher.finalize();
-        return (result[..32].to_vec(), result[32..].to_vec());
+        (result[..32].to_vec(), result[32..].to_vec())
     }
 
     fn _h(s: &[u8]) -> Vec<u8> {
         let mut hasher = Sha3_256::new();
         Update::update(&mut hasher, s);
         let result = hasher.finalize();
-        return result.to_vec();
+        result.to_vec()
     }
 
     fn _j(s: &[u8]) -> Vec<u8> {
@@ -292,12 +291,7 @@ impl MLKEM {
 fn select_bytes(a: &[u8], b: &[u8], cond: bool) -> Vec<u8> {
     // TODO: Add checks
     let mut out = vec![0_u8; a.len()];
-    let cw;
-    if cond == false {
-        cw = 0;
-    } else {
-        cw = 255;
-    }
+    let cw = if !cond { 0 } else { 255 };
     for i in 0..(a.len()) {
         out[i] = a[i] ^ (cw & (a[i] ^ b[i]))
     }
@@ -310,12 +304,12 @@ mod tests {
     use serde_json::Value;
     use std::fs;
 
-    fn keygen_kat(_type: TYPE, index: usize) {
+    fn keygen_kat(_type: Type, index: usize) {
         let data =
             fs::read_to_string("assets/ML-KEM-keyGen-FIPS203/internalProjection.json").unwrap();
         let json: Value = serde_json::from_str(&data).unwrap();
         let tests = json["testGroups"][index]["tests"].as_array().unwrap();
-        let ml_kem = MLKEM::new(_type);
+        let ml_kem = MLKem::new(_type);
         for value in tests.iter() {
             let z = &value["z"];
             let d = &value["d"];
@@ -335,12 +329,12 @@ mod tests {
         }
     }
 
-    fn encaps_kat(_type: TYPE, index: usize) {
+    fn encaps_kat(_type: Type, index: usize) {
         let data =
             fs::read_to_string("assets/ML-KEM-encapDecap-FIPS203/internalProjection.json").unwrap();
         let json: Value = serde_json::from_str(&data).unwrap();
         let tests = json["testGroups"][index]["tests"].as_array().unwrap();
-        let ml_kem = MLKEM::new(_type);
+        let ml_kem = MLKem::new(_type);
         for value in tests.iter() {
             let c = &value["c"];
             let k = &value["k"];
@@ -366,14 +360,14 @@ mod tests {
         }
     }
 
-    fn decaps_kat(_type: TYPE, index: usize) {
+    fn decaps_kat(_type: Type, index: usize) {
         let data =
             fs::read_to_string("assets/ML-KEM-encapDecap-FIPS203/internalProjection.json").unwrap();
         let json: Value = serde_json::from_str(&data).unwrap();
         let kat_data = json["testGroups"][3 + index]["tests"].as_array().unwrap();
         let dk = json["testGroups"][3 + index]["dk"].as_str().unwrap();
         let dk_as_bytes = hex::decode(dk).unwrap();
-        let ml_kem = MLKEM::new(_type);
+        let ml_kem = MLKem::new(_type);
         for value in kat_data.iter() {
             let c = &value["c"];
             let c_as_bytes = hex::decode(c.as_str().unwrap()).unwrap();
@@ -386,22 +380,22 @@ mod tests {
 
     #[test]
     fn test_keygen_using_kat() {
-        keygen_kat(TYPE::MlKem512, 0);
-        keygen_kat(TYPE::MlKem768, 1);
-        keygen_kat(TYPE::MlKem1024, 2);
+        keygen_kat(Type::MlKem512, 0);
+        keygen_kat(Type::MlKem768, 1);
+        keygen_kat(Type::MlKem1024, 2);
     }
 
     #[test]
     fn test_encaps_using_kat() {
-        encaps_kat(TYPE::MlKem512, 0);
-        encaps_kat(TYPE::MlKem768, 1);
-        encaps_kat(TYPE::MlKem1024, 2);
+        encaps_kat(Type::MlKem512, 0);
+        encaps_kat(Type::MlKem768, 1);
+        encaps_kat(Type::MlKem1024, 2);
     }
 
     #[test]
     fn test_decaps_using_kat() {
-        decaps_kat(TYPE::MlKem512, 0);
-        decaps_kat(TYPE::MlKem768, 1);
-        decaps_kat(TYPE::MlKem1024, 2);
+        decaps_kat(Type::MlKem512, 0);
+        decaps_kat(Type::MlKem768, 1);
+        decaps_kat(Type::MlKem1024, 2);
     }
 }

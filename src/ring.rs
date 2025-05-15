@@ -91,7 +91,7 @@ impl Ring {
     }
 
     pub fn decode(input_bytes: &[u8], d: usize, is_ntt: bool) -> Result<Self, String> {
-        if 256 * (d as usize) != input_bytes.len() * 8 {
+        if 256 * d != input_bytes.len() * 8 {
             return Err(String::from(
                 "input bytes must be a multiple of (polynomial degree) / 8",
             ));
@@ -105,7 +105,7 @@ impl Ring {
 
         let mut coefficients = vec![BigUint::zero(); 256];
         let mut b_int = BigUint::from_bytes_le(input_bytes);
-        let mask = BigUint::from((1 << d) - 1 as usize);
+        let mask = BigUint::from((1 << d) - 1_usize);
         for i in 0..256 {
             coefficients[i] = (b_int.clone() & mask.clone()) % m;
             b_int >>= d;
@@ -137,8 +137,8 @@ impl Ring {
 
     pub fn decompress_ele(&self, x: BigUint, d: u8) -> BigUint {
         let t: usize = 1 << (d - 1);
-        let y = (self.q * x + t) >> d;
-        y
+
+        (self.q * x + t) >> d
     }
 
     pub fn ntt_sample(input_bytes: &[u8]) -> Self {
@@ -155,15 +155,15 @@ impl Ring {
 
             if d_1 < 3329 {
                 coefficients[j] = BigUint::from(d_1);
-                j = j + 1
+                j += 1
             }
 
             if d_2 < 3329 && j < 256 {
                 coefficients[j] = BigUint::from(d_2);
-                j = j + 1
+                j += 1
             }
 
-            i = i + 3;
+            i += 3;
         }
         Ring::new(&coefficients, true)
     }
@@ -176,7 +176,7 @@ impl Ring {
         let mut coefficients = vec![BigUint::zero(); 256];
         let mut b_int = BigUint::from_bytes_le(input_bytes);
         let mask_1: usize = (1 << eta) - 1;
-        let mask_2: usize = (1 << 2 * eta) - 1;
+        let mask_2: usize = (1 << (2 * eta)) - 1;
         for i in 0..256 {
             let x = b_int.clone() & BigUint::from(mask_2);
             let a = x.clone() & BigUint::from(mask_1);
@@ -199,7 +199,7 @@ impl Ring {
             let mut start = 0;
             while start < 256 {
                 let zeta = zetas[k];
-                k = k + 1;
+                k += 1;
                 for j in start..(start + l) {
                     let t = zeta * &coefficients[j + l];
                     let first = &coefficients[j] + self.q;
@@ -209,7 +209,7 @@ impl Ring {
                 }
                 start += 2 * l;
             }
-            l = l >> 1;
+            l >>= 1;
         }
         Ring::new(&coefficients, true)
     }
@@ -224,7 +224,7 @@ impl Ring {
             let mut start = 0;
             while start < 256 {
                 let zeta = zetas[k];
-                k = k - 1;
+                k -= 1;
                 for j in start..(start + l) {
                     let t = &coefficients[j].clone();
                     coefficients[j] = t + &coefficients[j + l];
@@ -238,7 +238,7 @@ impl Ring {
                 }
                 start += 2 * l;
             }
-            l = l << 1;
+            l <<= 1;
         }
         for i in 0..256 {
             coefficients[i] = (&coefficients[i] * self.ntt_f) % self.q
@@ -259,13 +259,13 @@ impl Ring {
         (r_0, r_1)
     }
 
-    fn _ntt_coeff_mul(&self, f_coeffs: &Vec<BigUint>, g_coeffs: &Vec<BigUint>) -> Vec<BigUint> {
+    fn _ntt_coeff_mul(&self, f_coeffs: &[BigUint], g_coeffs: &[BigUint]) -> Vec<BigUint> {
         let mut new_coeffs = vec![];
         for i in 0..64 {
             let (r_0, r_1) = self._ntt_base_mul(
-                &f_coeffs[4 * i + 0],
+                &f_coeffs[4 * i],
                 &f_coeffs[4 * i + 1],
-                &g_coeffs[4 * i + 0],
+                &g_coeffs[4 * i],
                 &g_coeffs[4 * i + 1],
                 self.ntt_zetas[64 + i],
             );
@@ -330,7 +330,7 @@ impl Mul for &Ring {
     fn mul(self, rhs: Self) -> Self::Output {
         // TODO: Add checks
         if self.is_ntt && rhs.is_ntt {
-            Ok(self._ntt_mut(&rhs))
+            Ok(self._ntt_mut(rhs))
         } else if !self.is_ntt && !rhs.is_ntt {
             let mut new_coeffs = vec![BigUint::zero(); self.n];
             let n = self.n;
@@ -369,16 +369,14 @@ impl Debug for Ring {
                     } else {
                         write!(f, "x^{} + ", i)?;
                     }
+                } else if i == 255 {
+                    write!(f, "{}x^{}", value, i)?;
+                } else if i == 0 {
+                    write!(f, "{} + ", value)?;
+                } else if i == 1 {
+                    write!(f, "{}x + ", value)?;
                 } else {
-                    if i == 255 {
-                        write!(f, "{}x^{}", value, i)?;
-                    } else if i == 0 {
-                        write!(f, "{} + ", value)?;
-                    } else if i == 1 {
-                        write!(f, "{}x + ", value)?;
-                    } else {
-                        write!(f, "{}x^{} + ", value, i)?;
-                    }
+                    write!(f, "{}x^{} + ", value, i)?;
                 }
             }
         }
