@@ -2,7 +2,7 @@
 
 ## pqc-ml-kem.rs
 
-A rust library for ML-KEM(Module-Lattice-Based Key-Encryption Mechanism)
+A rust library for ML-KEM(Module-Lattice-Based Key-Encapsulation Mechanism)
 
 ### 🚧 Project Status
 
